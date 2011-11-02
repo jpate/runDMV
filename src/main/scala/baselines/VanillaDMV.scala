@@ -82,14 +82,14 @@ object VanillaDMV {
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
       val newGrammar = newPC.toDMVGrammar
-      if( iter %4 == 0 ) {
-        println( "newGrammar.p_order:\n" )
-        println( newGrammar.p_order )
-        println( "newGrammar.p_stop:\n" )
-        println( newGrammar.p_stop )
-        println( "newGrammar.p_choose:\n" )
-        println( newGrammar.p_choose )
-      }
+      // if( iter %4 == 0 ) {
+      //   println( "newGrammar.p_order:\n" )
+      //   println( newGrammar.p_order )
+      //   println( "newGrammar.p_stop:\n" )
+      //   println( newGrammar.p_stop )
+      //   println( "newGrammar.p_choose:\n" )
+      //   println( newGrammar.p_choose )
+      // }
 
       // println( newGrammar.p_order.keySet )
       // println( newGrammar.p_order.values.head.keySet )
@@ -109,11 +109,18 @@ object VanillaDMV {
       lastCorpusLogProb = corpusLogProb
     }
 
+    println( "final grammar p_order:\n" )
+    println( estimator.g.p_order )
+    println( "final grammar p_stop:\n" )
+    println( estimator.g.p_stop )
+    println( "final grammar p_choose:\n" )
+    println( estimator.g.p_choose )
+
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.dependencyParse( testSet ).mkString(
-      "it"+iter+":dependency:", "\nit"+iter+":dependency:", "" ) )
+      "convergence:dependency:", "\nit"+iter+":dependency:", "" ) )
     println( viterbiParser.constituencyParse( testSet ).mkString(
-      "it"+iter+":constituency:", "\nit"+iter+":constituency:", "" ) )
+      "convergence:constituency:", "\nit"+iter+":constituency:", "" ) )
 
   }
 }
