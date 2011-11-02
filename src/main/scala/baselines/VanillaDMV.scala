@@ -20,14 +20,14 @@ object VanillaDMV {
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
-    // optsParser.accepts( "initialGrammar" ).withRequiredArg
+    optsParser.accepts( "initialGrammar" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
-    // val grammarInitialization =
-    //   if( opts.has( "initialGrammar" ) ) opts.valueOf( "initialGrammar" ).toString else "p_split"
+    val grammarInitialization =
+      if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonicGrammar"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -46,8 +46,13 @@ object VanillaDMV {
 
 
     println( "trainStrings: " + trainStrings )
+    println( "grammarInitialization: " + grammarInitialization )
     println( "testStrings: " + testStrings )
-    // println( "grammarInitialization: " + grammarInitialization )
+    println( "rightFirst: " + rightFirst )
+    println( "cAttach: " + cAttach )
+    println( "cStop: " + cStop )
+    println( "cNotStop: " + cNotStop )
+    println( "stopUniformity: " + stopUniformity )
 
     print( "Reading in training set...." )
     val trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
@@ -66,20 +71,28 @@ object VanillaDMV {
     }
     println( " Done; " + testSet.size + " test set strings" )
 
-
-
-    val harmonicInitialization =
-      new DMVGrammar(
-        trainSet,
-        rightFirst = rightFirst,
-        cAttach = cAttach,
-        cStop = cStop,
-        cNotStop = cNotStop,
-        stopUniformity = stopUniformity
-      )
-
-
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
+
+
+    val initialGrammar =
+      if( grammarInitialization == "harmonic" ) {
+        print( "Initializing harmonic grammar..." )
+        new DMVGrammar(
+          trainSet,
+          rightFirst = rightFirst,
+          cAttach = cAttach,
+          cStop = cStop,
+          cNotStop = cNotStop,
+          stopUniformity = stopUniformity
+        )
+        println( " done" )
+      } else {
+        print( "Initializing uniform grammar...")
+        new DMVGrammar( vocab )
+        println( " done" )
+      }
+
+
     val estimator = new VanillaDMVEstimator( vocab )
     estimator.setGrammar( harmonicInitialization )
 
