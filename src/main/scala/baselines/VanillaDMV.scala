@@ -85,16 +85,16 @@ object VanillaDMV {
           cNotStop = cNotStop,
           stopUniformity = stopUniformity
         )
-        println( " done" )
       } else {
         print( "Initializing uniform grammar...")
         new DMVGrammar( vocab )
-        println( " done" )
       }
+
+    println( " done" )
 
 
     val estimator = new VanillaDMVEstimator( vocab )
-    estimator.setGrammar( harmonicInitialization )
+    estimator.setGrammar( initialGrammar )
 
     val viterbiParser = new VanillaDMVParser
     viterbiParser.setGrammar( estimator.g )
