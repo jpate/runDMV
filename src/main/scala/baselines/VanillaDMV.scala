@@ -65,7 +65,7 @@ object VanillaDMV {
       )
       println(
         viterbiParser.constituencyParse( testSet ).mkString(
-          "initial:constituency:", "\ninitial:constituency", "\n" )
+          "initial:constituency:", "\ninitial:constituency:", "\n" )
       )
     }
 
@@ -99,8 +99,10 @@ object VanillaDMV {
       if( iter%2 == 0 ) {
         Actor.spawn {
           viterbiParser.setGrammar( newGrammar )
-          println( viterbiParser.dependencyParse( testSet ).mkString( "it"+iter+":dependency:", "\nit"+iter+":", "" ) )
-          println( viterbiParser.constituencyParse( testSet ).mkString( "it"+iter+":constituency:", "\nit"+iter+":", "" ) )
+          println( viterbiParser.dependencyParse( testSet ).mkString(
+            "it"+iter+":dependency:", "\nit"+iter+":dependency:", "" ) )
+          println( viterbiParser.constituencyParse( testSet ).mkString(
+            "it"+iter+":constituency:", "\nit"+iter+":constituency:", "" ) )
         }
       }
       iter += 1
@@ -108,8 +110,10 @@ object VanillaDMV {
     }
 
     viterbiParser.setGrammar( estimator.g )
-    println( viterbiParser.dependencyParse( testSet ).mkString( "it"+iter+":dependency:", "\nit"+iter+":", "" ) )
-    println( viterbiParser.constituencyParse( testSet ).mkString( "it"+iter+":constituency:", "\nit"+iter+":", "" ) )
+    println( viterbiParser.dependencyParse( testSet ).mkString(
+      "it"+iter+":dependency:", "\nit"+iter+":dependency:", "" ) )
+    println( viterbiParser.constituencyParse( testSet ).mkString(
+      "it"+iter+":constituency:", "\nit"+iter+":constituency:", "" ) )
 
   }
 }
