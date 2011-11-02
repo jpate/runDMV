@@ -15,6 +15,11 @@ object VanillaDMV {
 
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
+    optsParser.accepts( "rightFirst" ).withRequiredArg
+    optsParser.accepts( "cAttach" ).withRequiredArg
+    optsParser.accepts( "cStop" ).withRequiredArg
+    optsParser.accepts( "cNotStop" ).withRequiredArg
+    optsParser.accepts( "stopUniformity" ).withRequiredArg
     // optsParser.accepts( "initialGrammar" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
@@ -23,6 +28,21 @@ object VanillaDMV {
     val testStrings = opts.valueOf( "testStrings" ).toString
     // val grammarInitialization =
     //   if( opts.has( "initialGrammar" ) ) opts.valueOf( "initialGrammar" ).toString else "p_split"
+
+    val rightFirst =
+      if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
+
+    val cAttach =
+      if(opts.has( "cAttach" )) opts.valueOf( "cAttach" ).toString.toDouble else 15.0
+
+    val cStop =
+      if(opts.has( "cStop" ) ) opts.valueOf( "cStop" ).toString.toDouble else 3.0
+
+    val cNotStop =
+      if(opts.has( "cNotStop" )) opts.valueOf( "cNotStop" ).toString.toDouble else 1.0
+
+    val stopUniformity =
+      if(opts.has( "stopUniformity" )) opts.valueOf( "stopUniformity" ).toString.toDouble else 20.0
 
 
     println( "trainStrings: " + trainStrings )
@@ -48,7 +68,15 @@ object VanillaDMV {
 
 
 
-    val harmonicInitialization = new DMVGrammar( trainSet )
+    val harmonicInitialization =
+      new DMVGrammar(
+        trainSet,
+        rightFirst = rightFirst,
+        cAttach = cAttach,
+        cStop = cStop,
+        cNotStop = cNotStop,
+        stopUniformity = stopUniformity
+      )
 
 
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
