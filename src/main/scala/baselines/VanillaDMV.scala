@@ -21,6 +21,7 @@ object VanillaDMV {
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     optsParser.accepts( "initialGrammar" ).withRequiredArg
+    optsParser.accepts( "evalFreq" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -44,6 +45,9 @@ object VanillaDMV {
     val stopUniformity =
       if(opts.has( "stopUniformity" )) opts.valueOf( "stopUniformity" ).toString.toDouble else 20.0
 
+    val evalFreq =
+      if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
+
 
     println( "trainStrings: " + trainStrings )
     println( "grammarInitialization: " + grammarInitialization )
@@ -53,6 +57,7 @@ object VanillaDMV {
     println( "cStop: " + cStop )
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
+    println( "evalFreq: " + evalFreq )
 
     print( "Reading in training set...." )
     val trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
@@ -137,7 +142,7 @@ object VanillaDMV {
       //println( newGrammar.p_order )//.parents.mkString( "\n\t","\n\t","\n\n----\n\n" ) )
       estimator.setGrammar( newGrammar )
 
-      if( iter%2 == 0 ) {
+      if( iter%evalFreq == 0 ) {
         Actor.spawn {
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.dependencyParse( testSet ).mkString(
