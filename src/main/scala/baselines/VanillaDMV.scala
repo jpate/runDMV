@@ -118,9 +118,9 @@ object VanillaDMV {
 
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.dependencyParse( testSet ).mkString(
-      "convergence:dependency:", "\nit"+iter+":dependency:", "" ) )
+      "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     println( viterbiParser.constituencyParse( testSet ).mkString(
-      "convergence:constituency:", "\nit"+iter+":constituency:", "" ) )
+      "convergence:constituency:", "\nconvergence:constituency:", "" ) )
 
   }
 }
