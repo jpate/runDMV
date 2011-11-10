@@ -132,12 +132,13 @@ object VanillaDMV {
       estimator.setGrammar( newGrammar )
 
       if( iter%evalFreq == 0 ) {
+        val iterLabel = "it" + iter
         Actor.spawn {
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.dependencyParse( testSet ).mkString(
-            "it"+iter+":dependency:", "\nit"+iter+":dependency:", "" ) )
+            iterLabel+":dependency:", "\nit"+iter+":dependency:", "" ) )
           println( viterbiParser.constituencyParse( testSet ).mkString(
-            "it"+iter+":constituency:", "\nit"+iter+":constituency:", "" ) )
+            iterLabel+":constituency:", "\nit"+iter+":constituency:", "" ) )
         }
       }
       iter += 1
