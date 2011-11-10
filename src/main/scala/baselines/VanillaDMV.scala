@@ -128,18 +128,7 @@ object VanillaDMV {
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
       val newGrammar = newPC.toDMVGrammar
-      // if( iter %4 == 0 ) {
-      //   println( "newGrammar.p_order:\n" )
-      //   println( newGrammar.p_order )
-      //   println( "newGrammar.p_stop:\n" )
-      //   println( newGrammar.p_stop )
-      //   println( "newGrammar.p_choose:\n" )
-      //   println( newGrammar.p_choose )
-      // }
 
-      // println( newGrammar.p_order.keySet )
-      // println( newGrammar.p_order.values.head.keySet )
-      //println( newGrammar.p_order )//.parents.mkString( "\n\t","\n\t","\n\n----\n\n" ) )
       estimator.setGrammar( newGrammar )
 
       if( iter%evalFreq == 0 ) {
@@ -155,12 +144,7 @@ object VanillaDMV {
       lastCorpusLogProb = corpusLogProb
     }
 
-    println( "final grammar p_order:\n" )
-    println( estimator.g.p_order )
-    println( "final grammar p_stop:\n" )
-    println( estimator.g.p_stop )
-    println( "final grammar p_choose:\n" )
-    println( estimator.g.p_choose )
+    println( "Final grammar:\n" + estimator.g )
 
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.dependencyParse( testSet ).mkString(
