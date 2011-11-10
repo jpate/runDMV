@@ -138,9 +138,9 @@ object VanillaDMV {
         Actor.spawn {
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.dependencyParse( testSet ).mkString(
-            iterLabel+":dependency:", "\nit"+iter+":dependency:", "" ) )
+            iterLabel+":dependency:", iterLabel+":dependency:", "" ) )
           println( viterbiParser.constituencyParse( testSet ).mkString(
-            iterLabel+":constituency:", "\nit"+iter+":constituency:", "" ) )
+            iterLabel+":constituency:", iterLabel+":constituency:", "" ) )
         }
       }
       iter += 1
