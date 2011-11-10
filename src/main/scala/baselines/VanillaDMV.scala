@@ -28,7 +28,7 @@ object VanillaDMV {
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
     val grammarInitialization =
-      if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonicGrammar"
+      if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
