@@ -97,6 +97,8 @@ object VanillaDMV {
 
     println( " done" )
 
+    println( "Initial grammar:\n\n" )
+    println( initialGrammar )
 
     val estimator = new VanillaDMVEstimator( vocab )
     estimator.setGrammar( initialGrammar )
