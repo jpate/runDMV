@@ -103,10 +103,11 @@ object VanillaDMV {
     val estimator = new VanillaDMVEstimator( vocab )
     estimator.setGrammar( initialGrammar )
 
-    val viterbiParser = new VanillaDMVParser
-    viterbiParser.setGrammar( estimator.g )
+    // val viterbiParser = new VanillaDMVParser
+    // viterbiParser.setGrammar( estimator.g )
 
     Actor.spawn{
+      val viterbiParser = new VanillaDMVParser
       println(
         viterbiParser.dependencyParse( testSet ).mkString(
           "initial:dependency:", "\ninitial:dependency:", "\n" )
@@ -136,6 +137,7 @@ object VanillaDMV {
       if( iter%evalFreq == 0 ) {
         val iterLabel = "it" + iter
         Actor.spawn {
+          val viterbiParser = new VanillaDMVParser
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.dependencyParse( testSet ).mkString(
             iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
@@ -149,6 +151,7 @@ object VanillaDMV {
 
     println( "Final grammar:\n" + estimator.g )
 
+    val viterbiParser = new VanillaDMVParser
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.dependencyParse( testSet ).mkString(
       "convergence:dependency:", "\nconvergence:dependency:", "" ) )
