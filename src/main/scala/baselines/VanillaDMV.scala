@@ -129,14 +129,15 @@ object VanillaDMV {
     Actor.spawn{
       val viterbiParser = new VanillaDMVParser
       viterbiParser.setGrammar( estimator.g )
-      println(
-        viterbiParser.dependencyParse( testSet ).mkString(
-          "initial:dependency:", "\ninitial:dependency:", "\n" )
-      )
-      println(
-        viterbiParser.constituencyParse( testSet ).mkString(
-          "initial:constituency:", "\ninitial:constituency:", "\n" )
-      )
+      println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
+      // println(
+      //   viterbiParser.dependencyParse( testSet ).mkString(
+      //     "initial:dependency:", "\ninitial:dependency:", "\n" )
+      // )
+      // println(
+      //   viterbiParser.constituencyParse( testSet ).mkString(
+      //     "initial:constituency:", "\ninitial:constituency:", "\n" )
+      // )
     }
 
     var deltaLogProb = 1D
@@ -160,10 +161,12 @@ object VanillaDMV {
         Actor.spawn {
           val viterbiParser = new VanillaDMVParser
           viterbiParser.setGrammar( newGrammar )
-          println( viterbiParser.dependencyParse( testSet ).mkString(
-            iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
-          println( viterbiParser.constituencyParse( testSet ).mkString(
-            iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
+          println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+
+          // println( viterbiParser.dependencyParse( testSet ).mkString(
+          //   iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
+          // println( viterbiParser.constituencyParse( testSet ).mkString(
+          //   iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
         }
       }
       iter += 1
@@ -174,10 +177,11 @@ object VanillaDMV {
 
     val viterbiParser = new VanillaDMVParser
     viterbiParser.setGrammar( estimator.g )
-    println( viterbiParser.dependencyParse( testSet ).mkString(
-      "convergence:dependency:", "\nconvergence:dependency:", "" ) )
-    println( viterbiParser.constituencyParse( testSet ).mkString(
-      "convergence:constituency:", "\nconvergence:constituency:", "" ) )
+    println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
+    // println( viterbiParser.dependencyParse( testSet ).mkString(
+    //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
+    // println( viterbiParser.constituencyParse( testSet ).mkString(
+    //   "convergence:constituency:", "\nconvergence:constituency:", "" ) )
 
   }
 }
