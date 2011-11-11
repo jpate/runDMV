@@ -60,10 +60,22 @@ object VanillaDMV {
     println( "evalFreq: " + evalFreq )
 
     print( "Reading in training set...." )
-    val trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
+    val findRareWords = collection.mutable.Map[Word,Int]();
+    var trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
-      ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s, t ) => new TimedWord(s,t) }.toList
+      ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s, t ) =>
+        findRareWords( Word(s) ) = 1 + findRareWords.getOrElse( Word(s), 0 )
+        new TimedWord(s,t)
+      }.toList
     }
+    trainSet = trainSet.map( s =>
+      s.map{ case TimedWord( w, t ) =>
+        if( findRareWords( Word( w ) ) < 1 )
+          new TimedWord( "UNK", t )
+        else
+          new TimedWord( w, t )
+      }
+    )
     println( " Done; " + trainSet.size + " training set strings" )
 
     print( "Reading in test set...." )
@@ -71,43 +83,50 @@ object VanillaDMV {
       val fields = line.split( " " ).toList
       TimedSentence(
         fields head,
-        ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) => new TimedWord(s,t) }.toList
+        ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
+          if( findRareWords.getOrElse( Word(s), 0 )  < 1 )
+            new TimedWord( "UNK", t )
+          else
+            new TimedWord(s,t)
+        }.toList
       )
     }
     println( " Done; " + testSet.size + " test set strings" )
 
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
 
+    val estimator = new VanillaDMVEstimator( vocab )
+    //estimator.set
+    //estimator.setGrammar( initialGrammar )
 
-    val initialGrammar =
-      if( grammarInitialization == "harmonic" ) {
-        print( "Initializing harmonic grammar..." )
-        new DMVGrammar(
-          trainSet,
-          rightFirst = rightFirst,
-          cAttach = cAttach,
-          cStop = cStop,
-          cNotStop = cNotStop,
-          stopUniformity = stopUniformity
-        )
-      } else {
-        print( "Initializing uniform grammar...")
-        new DMVGrammar( vocab )
-      }
+    //val initialGrammar =
+    if( grammarInitialization == "harmonic" ) {
+      print( "Initializing harmonic grammar..." )
+      estimator.setHarmonicGrammar(
+        trainSet,
+        rightFirst = rightFirst,
+        cAttach = cAttach,
+        cStop = cStop,
+        cNotStop = cNotStop,
+        stopUniformity = stopUniformity
+      )
+    } else {
+      print( "Initializing uniform grammar...")
+      new DMVGrammar( vocab )
+    }
 
     println( " done" )
 
     println( "Initial grammar:\n\n" )
-    println( initialGrammar )
+    println( estimator.g )
 
-    val estimator = new VanillaDMVEstimator( vocab )
-    estimator.setGrammar( initialGrammar )
 
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )
 
     Actor.spawn{
       val viterbiParser = new VanillaDMVParser
+      viterbiParser.setGrammar( estimator.g )
       println(
         viterbiParser.dependencyParse( testSet ).mkString(
           "initial:dependency:", "\ninitial:dependency:", "\n" )
