@@ -70,7 +70,7 @@ object VanillaDMV {
     }
     trainSet = trainSet.map( s =>
       s.map{ case TimedWord( w, t ) =>
-        if( findRareWords( Word( w ) ) < 1 )
+        if( findRareWords( Word( w ) ) <= 1 )
           new TimedWord( "UNK", t )
         else
           new TimedWord( w, t )
@@ -84,10 +84,12 @@ object VanillaDMV {
       TimedSentence(
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
-          if( findRareWords.getOrElse( Word(s), 0 )  < 1 )
+          if( findRareWords.getOrElse( Word(s), 0 )  <= 1 ) {
+            println( "Considering " + s + " as UNK" )
             new TimedWord( "UNK", t )
-          else
+          } else {
             new TimedWord(s,t)
+          }
         }.toList
       )
     }
