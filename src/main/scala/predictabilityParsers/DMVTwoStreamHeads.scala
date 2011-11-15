@@ -175,9 +175,6 @@ object DMVTwoStreamHeads {
 
       val newGrammar = newPC.toDMVGrammar
 
-      println( "newGrammar:")
-      println( newGrammar )
-
       estimator.setGrammar( newGrammar )
 
       if( iter%evalFreq == 0 ) {
