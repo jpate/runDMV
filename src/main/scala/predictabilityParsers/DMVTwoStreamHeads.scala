@@ -1,14 +1,14 @@
-package runDMV.baselines
+package runDMV.predictabilityParsers
 
 import akka.actor.Actor
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
-import predictabilityParsing.grammars.DMVGrammar
+import predictabilityParsing.grammars.DMVTwoStreamHeadsGrammar
 import predictabilityParsing.types.labels._
 
-object VanillaDMV {
+object DMVTwoStreamHeads {
   def main( args:Array[String]) {
 
     val optsParser = new OptionParser()
@@ -60,20 +60,25 @@ object VanillaDMV {
     println( "evalFreq: " + evalFreq )
 
     print( "Reading in training set...." )
-    val findRareWords = collection.mutable.Map[Word,Int]();
+    val findRareWords = collection.mutable.Map[WordPair,Int]();
     var trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
       ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s, t ) =>
-        findRareWords( Word(s) ) = 1 + findRareWords.getOrElse( Word(s), 0 )
-        new TimedWord(s,t)
+        val wordParts = s.split( "#" );
+
+        val wp = WordPair( wordParts(0), wordParts(1) )
+
+        findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
+
+        new TimedWordPair( wordParts(0), wordParts(1), t)
       }.toList
     }
     trainSet = trainSet.map( s =>
-      s.map{ case TimedWord( w, t ) =>
-        if( findRareWords( Word( w ) ) <= 1 )
-          new TimedWord( "UNK", t )
+      s.map{ case TimedWordPair( w1, w2, t ) =>
+        if( findRareWords( WordPair( w1, w2 ) ) <= 1 )
+          new TimedWordPair( "UNK", w2, t )
         else
-          new TimedWord( w, t )
+          new TimedWordPair( w1, w2, t )
       }
     )
     println( " Done; " + trainSet.size + " training set strings" )
@@ -81,25 +86,37 @@ object VanillaDMV {
     print( "Reading in test set...." )
     val testSet = io.Source.fromFile( testStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
-      TimedSentence(
+      TimedTwoStreamSentence(
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
-          if( findRareWords.getOrElse( Word(s), 0 )  <= 1 ) {
-            println( "Considering " + s + " as UNK" )
-            new TimedWord( "UNK", t )
+
+          val wordParts = s.split( "#" );
+          val wp = WordPair( wordParts(0), wordParts(1) )
+
+          if( findRareWords.getOrElse( wp, 0 )  <= 1 ) {
+            println( "Considering " + wp + " as UNK" )
+
+            new TimedWordPair( "UNK", wordParts(1), t )
+
           } else {
-            new TimedWord(s,t)
+            new TimedWordPair( wordParts(0), wordParts(1), t)
           }
         }.toList
       )
     }
     println( " Done; " + testSet.size + " test set strings" )
 
-    val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
+    val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp} }.toSet
 
-    val estimator = new VanillaDMVEstimator //( vocab )
+    // This is the magic line... it should be enough to get this estimator relying on two stream
+    // heads and stream A args...
+    val estimator = new VanillaDMVEstimator {//( vocab )
+      override val g = new DMVTwoStreamHeadsGrammar
+    }
     //estimator.set
     //estimator.setGrammar( initialGrammar )
+
+    //estimator.setGrammar( new DMVTwoStreamHeadsGrammar ) //( vocab ) )
 
     //val initialGrammar =
     if( grammarInitialization == "harmonic" ) {
@@ -113,9 +130,10 @@ object VanillaDMV {
         stopUniformity = stopUniformity
       )
     } else {
+      // TODO this is probably wrong...
       print( "Initializing uniform grammar...")
       print( "ACTUALLY THIS DOES NOT WORK" )
-      new DMVGrammar//( vocab )
+      new DMVTwoStreamHeadsGrammar//( vocab )
     }
 
     println( " done" )
@@ -128,7 +146,9 @@ object VanillaDMV {
     // viterbiParser.setGrammar( estimator.g )
 
     Actor.spawn{
-      val viterbiParser = new VanillaDMVParser
+      val viterbiParser = new VanillaDMVParser {
+        override val g = new DMVTwoStreamHeadsGrammar
+      }
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       // println(
@@ -163,7 +183,9 @@ object VanillaDMV {
       if( iter%evalFreq == 0 ) {
         val iterLabel = "it" + iter
         Actor.spawn {
-          val viterbiParser = new VanillaDMVParser
+          val viterbiParser = new VanillaDMVParser {
+            override val g = new DMVTwoStreamHeadsGrammar
+          }
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
 
@@ -179,7 +201,9 @@ object VanillaDMV {
 
     println( "Final grammar:\n" + estimator.g )
 
-    val viterbiParser = new VanillaDMVParser
+    val viterbiParser = new VanillaDMVParser {
+      override val g = new DMVTwoStreamHeadsGrammar
+    }
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
     // println( viterbiParser.dependencyParse( testSet ).mkString(
