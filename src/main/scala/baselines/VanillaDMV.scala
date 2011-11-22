@@ -20,15 +20,15 @@ object VanillaDMV {
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
-    optsParser.accepts( "initialGrammar" ).withRequiredArg
+    // optsParser.accepts( "initialGrammar" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
-    val grammarInitialization =
-      if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
+    // val grammarInitialization =
+    //   if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -50,7 +50,7 @@ object VanillaDMV {
 
 
     println( "trainStrings: " + trainStrings )
-    println( "grammarInitialization: " + grammarInitialization )
+    //println( "grammarInitialization: " + grammarInitialization )
     println( "testStrings: " + testStrings )
     println( "rightFirst: " + rightFirst )
     println( "cAttach: " + cAttach )
@@ -58,6 +58,8 @@ object VanillaDMV {
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
+
+    val unkCutoff = 5
 
     print( "Reading in training set...." )
     val findRareWords = collection.mutable.Map[Word,Int]();
@@ -70,7 +72,7 @@ object VanillaDMV {
     }
     trainSet = trainSet.map( s =>
       s.map{ case TimedWord( w, t ) =>
-        if( findRareWords( Word( w ) ) <= 1 )
+        if( findRareWords( Word( w ) ) <= unkCutoff )
           new TimedWord( "UNK", t )
         else
           new TimedWord( w, t )
@@ -84,8 +86,8 @@ object VanillaDMV {
       TimedSentence(
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
-          if( findRareWords.getOrElse( Word(s), 0 )  <= 1 ) {
-            println( "Considering " + s + " as UNK" )
+          if( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) {
+            //println( "Considering " + s + " as UNK" )
             new TimedWord( "UNK", t )
           } else {
             new TimedWord(s,t)
@@ -97,26 +99,18 @@ object VanillaDMV {
 
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
 
-    val estimator = new VanillaDMVEstimator //( vocab )
-    //estimator.set
-    //estimator.setGrammar( initialGrammar )
+    val estimator = new VanillaDMVEstimator
 
     //val initialGrammar =
-    if( grammarInitialization == "harmonic" ) {
-      print( "Initializing harmonic grammar..." )
-      estimator.setHarmonicGrammar(
-        trainSet,
-        rightFirst = rightFirst,
-        cAttach = cAttach,
-        cStop = cStop,
-        cNotStop = cNotStop,
-        stopUniformity = stopUniformity
-      )
-    } else {
-      print( "Initializing uniform grammar...")
-      print( "ACTUALLY THIS DOES NOT WORK" )
-      new DMVGrammar//( vocab )
-    }
+    print( "Initializing harmonic grammar..." )
+    estimator.setHarmonicGrammar(
+      trainSet,
+      rightFirst = rightFirst,
+      cAttach = cAttach,
+      cStop = cStop,
+      cNotStop = cNotStop,
+      stopUniformity = stopUniformity
+    )
 
     println( " done" )
 
@@ -154,9 +148,6 @@ object VanillaDMV {
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
       val newGrammar = newPC.toDMVGrammar
-
-      println( "newGrammar:")
-      println( newGrammar )
 
       estimator.setGrammar( newGrammar )
 

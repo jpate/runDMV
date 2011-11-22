@@ -5,10 +5,10 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
-import predictabilityParsing.grammars.DMVTwoStreamHeadsGrammar
+import predictabilityParsing.grammars.DMVIndependentStreamHeadsGrammar
 import predictabilityParsing.types.labels._
 
-object DMVTwoStreamHeads {
+object DMVIndependentStreamHeads {
   def main( args:Array[String]) {
 
     val optsParser = new OptionParser()
@@ -20,15 +20,13 @@ object DMVTwoStreamHeads {
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
-    optsParser.accepts( "initialGrammar" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
+    optsParser.accepts( "unkCutoff" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
-    val grammarInitialization =
-      if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -48,9 +46,11 @@ object DMVTwoStreamHeads {
     val evalFreq =
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
 
+    val unkCutoff =
+      if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 1
+
 
     println( "trainStrings: " + trainStrings )
-    println( "grammarInitialization: " + grammarInitialization )
     println( "testStrings: " + testStrings )
     println( "rightFirst: " + rightFirst )
     println( "cAttach: " + cAttach )
@@ -58,6 +58,8 @@ object DMVTwoStreamHeads {
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
+    println( "unkCutoff: " + unkCutoff )
+
 
     print( "Reading in training set...." )
     val findRareWords = collection.mutable.Map[WordPair,Int]();
@@ -75,7 +77,7 @@ object DMVTwoStreamHeads {
     }
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
-        if( findRareWords( WordPair( w1, w2 ) ) <= 1 )
+        if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
           new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
@@ -93,7 +95,7 @@ object DMVTwoStreamHeads {
           val wordParts = s.split( "#" );
           val wp = WordPair( wordParts(0), wordParts(1) )
 
-          if( findRareWords.getOrElse( wp, 0 )  <= 1 ) {
+          if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
             new TimedWordPair( "UNK", wordParts(1), t )
@@ -111,30 +113,22 @@ object DMVTwoStreamHeads {
     // This is the magic line... it should be enough to get this estimator relying on two stream
     // heads and stream A args...
     val estimator = new VanillaDMVEstimator {//( vocab )
-      override val g = new DMVTwoStreamHeadsGrammar
+      override val g = new DMVIndependentStreamHeadsGrammar
     }
     //estimator.set
-    //estimator.setGrammar( initialGrammar )
 
     //estimator.setGrammar( new DMVTwoStreamHeadsGrammar ) //( vocab ) )
 
     //val initialGrammar =
-    if( grammarInitialization == "harmonic" ) {
-      print( "Initializing harmonic grammar..." )
-      estimator.setHarmonicGrammar(
-        trainSet,
-        rightFirst = rightFirst,
-        cAttach = cAttach,
-        cStop = cStop,
-        cNotStop = cNotStop,
-        stopUniformity = stopUniformity
-      )
-    } else {
-      // TODO this is probably wrong...
-      print( "Initializing uniform grammar...")
-      print( "ACTUALLY THIS DOES NOT WORK" )
-      new DMVTwoStreamHeadsGrammar//( vocab )
-    }
+    print( "Initializing harmonic grammar..." )
+    estimator.setHarmonicGrammar(
+      trainSet,
+      rightFirst = rightFirst,
+      cAttach = cAttach,
+      cStop = cStop,
+      cNotStop = cNotStop,
+      stopUniformity = stopUniformity
+    )
 
     println( " done" )
 
@@ -147,7 +141,7 @@ object DMVTwoStreamHeads {
 
     Actor.spawn{
       val viterbiParser = new VanillaDMVParser {
-        override val g = new DMVTwoStreamHeadsGrammar
+      override val g = new DMVIndependentStreamHeadsGrammar
       }
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
@@ -174,13 +168,17 @@ object DMVTwoStreamHeads {
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
       val newGrammar = newPC.toDMVGrammar
+
+      // println( "New grammar:\n\n" )
+      // println( newGrammar )
+
       estimator.setGrammar( newGrammar )
 
       if( iter%evalFreq == 0 ) {
         val iterLabel = "it" + iter
         Actor.spawn {
           val viterbiParser = new VanillaDMVParser {
-            override val g = new DMVTwoStreamHeadsGrammar
+            override val g = new DMVIndependentStreamHeadsGrammar
           }
           viterbiParser.setGrammar( newGrammar )
           println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
@@ -198,7 +196,7 @@ object DMVTwoStreamHeads {
     println( "Final grammar:\n" + estimator.g )
 
     val viterbiParser = new VanillaDMVParser {
-      override val g = new DMVTwoStreamHeadsGrammar
+      override val g = new DMVIndependentStreamHeadsGrammar
     }
     viterbiParser.setGrammar( estimator.g )
     println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
