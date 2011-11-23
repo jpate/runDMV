@@ -47,7 +47,7 @@ object DMVTwoStreamHeadsIndependentArgs {
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
 
     val unkCutoff =
-      if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 1
+      if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
 
 
     println( "trainStrings: " + trainStrings )

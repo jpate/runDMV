@@ -22,6 +22,7 @@ object VanillaDMV {
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     // optsParser.accepts( "initialGrammar" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
+    optsParser.accepts( "unkCutoff" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -48,6 +49,9 @@ object VanillaDMV {
     val evalFreq =
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
 
+    val unkCutoff =
+      if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
+
 
     println( "trainStrings: " + trainStrings )
     //println( "grammarInitialization: " + grammarInitialization )
@@ -58,8 +62,9 @@ object VanillaDMV {
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
+    println( "unkCutoff: " + unkCutoff )
 
-    val unkCutoff = 5
+    //val unkCutoff = 5
 
     print( "Reading in training set...." )
     val findRareWords = collection.mutable.Map[Word,Int]();

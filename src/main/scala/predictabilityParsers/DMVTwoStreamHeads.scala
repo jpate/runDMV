@@ -22,6 +22,7 @@ object DMVTwoStreamHeads {
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     optsParser.accepts( "initialGrammar" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
+    optsParser.accepts( "unkCutoff" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -48,6 +49,9 @@ object DMVTwoStreamHeads {
     val evalFreq =
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
 
+    val unkCutoff =
+      if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
+
 
     println( "trainStrings: " + trainStrings )
     println( "grammarInitialization: " + grammarInitialization )
@@ -58,6 +62,7 @@ object DMVTwoStreamHeads {
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
+    println( "unkCutoff: " + unkCutoff )
 
     print( "Reading in training set...." )
     val findRareWords = collection.mutable.Map[WordPair,Int]();
@@ -75,7 +80,7 @@ object DMVTwoStreamHeads {
     }
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
-        if( findRareWords( WordPair( w1, w2 ) ) <= 1 )
+        if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
           new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
@@ -93,7 +98,7 @@ object DMVTwoStreamHeads {
           val wordParts = s.split( "#" );
           val wp = WordPair( wordParts(0), wordParts(1) )
 
-          if( findRareWords.getOrElse( wp, 0 )  <= 1 ) {
+          if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
             new TimedWordPair( "UNK", wordParts(1), t )
