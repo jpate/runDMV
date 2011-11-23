@@ -92,7 +92,7 @@ object VanillaDMV {
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
           if( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) {
-            //println( "Considering " + s + " as UNK" )
+            println( "Considering " + s + " as UNK" )
             new TimedWord( "UNK", t )
           } else {
             new TimedWord(s,t)
