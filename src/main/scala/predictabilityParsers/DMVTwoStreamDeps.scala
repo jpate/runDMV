@@ -160,12 +160,10 @@ object DMVTwoStreamDeps {
 
     Actor.spawn{
       if( maxMarginalParse ) {
-        val viterbiParser = new VanillaDMVEstimator
-        viterbiParser.setGrammar( estimator.g )
+        val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
         println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
       } else {
-        val viterbiParser = new VanillaDMVParser
-        viterbiParser.setGrammar( estimator.g )
+        val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
         println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       }
       // val viterbiParser = new VanillaDMVParser {
