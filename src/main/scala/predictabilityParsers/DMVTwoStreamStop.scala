@@ -22,6 +22,10 @@ object DMVTwoStreamStop {
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
     optsParser.accepts( "unkCutoff" ).withRequiredArg
+    optsParser.accepts( "vbEM" ).withRequiredArg
+    optsParser.accepts( "convergence" ).withRequiredArg
+    optsParser.accepts( "minIter" ).withRequiredArg
+    optsParser.accepts( "maxMarginalParse" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -49,6 +53,17 @@ object DMVTwoStreamStop {
     val unkCutoff =
       if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
 
+    val vbEM =
+      if(opts.has( "vbEM" )) opts.valueOf( "vbEM" ).toString.toDouble else 0D
+
+    val minIter =
+      if(opts.has( "minIter" )) opts.valueOf( "minIter" ).toString.toDouble else 1D
+
+    val convergence =
+      if(opts.has( "convergence" )) opts.valueOf( "convergence").toString.toDouble else 0.00001
+
+    val maxMarginalParse = opts.has( "maxMarginalParse" )
+
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -59,6 +74,10 @@ object DMVTwoStreamStop {
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoff: " + unkCutoff )
+    println( "vbEM: " + vbEM )
+    println( "minIter: " + minIter )
+    println( "convergence: " + convergence )
+    println( "maxMarginalParse: " + maxMarginalParse )
 
 
     print( "Reading in training set...." )
@@ -140,11 +159,20 @@ object DMVTwoStreamStop {
     // viterbiParser.setGrammar( estimator.g )
 
     Actor.spawn{
-      val viterbiParser = new VanillaDMVParser {
-      override val g = new DMVTwoStreamStopGrammar
+      if( maxMarginalParse ) {
+        val viterbiParser = new VanillaDMVEstimator
+        viterbiParser.setGrammar( estimator.g )
+        println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
+      } else {
+        val viterbiParser = new VanillaDMVParser
+        viterbiParser.setGrammar( estimator.g )
+        println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       }
-      viterbiParser.setGrammar( estimator.g )
-      println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
+      // val viterbiParser = new VanillaDMVParser {
+      // override val g = new DMVTwoStreamStopGrammar
+      // }
+      // viterbiParser.setGrammar( estimator.g )
+      // println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       // println(
       //   viterbiParser.dependencyParse( testSet ).mkString(
       //     "initial:dependency:", "\ninitial:dependency:", "\n" )
@@ -160,14 +188,22 @@ object DMVTwoStreamStop {
     var iter = 0
 
     println( "Beginning EM" )
-    while( deltaLogProb > 0.00001 || deltaLogProb == (0D/0D) || iter < 10 ) {
+    while(
+      math.abs( deltaLogProb ) > convergence ||
+      deltaLogProb == (0D/0D) ||
+      iter < minIter
+    ) {
       val newPC = estimator.computePartialCounts( trainSet )
       val corpusLogProb = newPC.getTotalScore
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
-      val newGrammar = newPC.toDMVGrammar
+      val newGrammar =
+        if( vbEM > 0 )
+          newPC.toVariationalDMVGrammar( vbEM )
+        else
+          newPC.toDMVGrammar
 
       // println( "New grammar:\n\n" )
       // println( newGrammar )
@@ -177,11 +213,20 @@ object DMVTwoStreamStop {
       if( iter%evalFreq == 0 ) {
         val iterLabel = "it" + iter
         Actor.spawn {
-          val viterbiParser = new VanillaDMVParser {
-            override val g = new DMVTwoStreamStopGrammar
+          if( maxMarginalParse ) {
+            val viterbiParser = new VanillaDMVEstimator
+            viterbiParser.setGrammar( estimator.g )
+            println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+          } else {
+            val viterbiParser = new VanillaDMVParser
+            viterbiParser.setGrammar( estimator.g )
+            println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
-          viterbiParser.setGrammar( newGrammar )
-          println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+          // val viterbiParser = new VanillaDMVParser {
+          //   override val g = new DMVTwoStreamStopGrammar
+          // }
+          // viterbiParser.setGrammar( newGrammar )
+          // println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
 
           // println( viterbiParser.dependencyParse( testSet ).mkString(
           //   iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
@@ -195,11 +240,20 @@ object DMVTwoStreamStop {
 
     println( "Final grammar:\n" + estimator.g )
 
-    val viterbiParser = new VanillaDMVParser {
-      override val g = new DMVTwoStreamStopGrammar
+    if( maxMarginalParse ) {
+      val viterbiParser = new VanillaDMVEstimator
+      viterbiParser.setGrammar( estimator.g )
+      println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else {
+      val viterbiParser = new VanillaDMVParser
+      viterbiParser.setGrammar( estimator.g )
+      println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
-    viterbiParser.setGrammar( estimator.g )
-    println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
+    // val viterbiParser = new VanillaDMVParser {
+    //   override val g = new DMVTwoStreamStopGrammar
+    // }
+    // viterbiParser.setGrammar( estimator.g )
+    // println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
     // println( viterbiParser.dependencyParse( testSet ).mkString(
     //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     // println( viterbiParser.constituencyParse( testSet ).mkString(

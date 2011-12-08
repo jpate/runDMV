@@ -1,14 +1,14 @@
-package runDMV.baselines
+package runDMV.predictabilityParsers
 
 import akka.actor.Actor
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
-import predictabilityParsing.grammars.DMVGrammar
+import predictabilityParsing.grammars.DMVTwoStreamDepsGrammar
 import predictabilityParsing.types.labels._
 
-object VanillaDMV {
+object DMVTwoStreamDeps {
   def main( args:Array[String]) {
 
     val optsParser = new OptionParser()
@@ -25,15 +25,12 @@ object VanillaDMV {
     optsParser.accepts( "vbEM" ).withRequiredArg
     optsParser.accepts( "convergence" ).withRequiredArg
     optsParser.accepts( "minIter" ).withRequiredArg
-    optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "maxMarginalParse" )
 
     val opts = optsParser.parse( args:_* )
 
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
-    // val grammarInitialization =
-    //   if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -65,8 +62,6 @@ object VanillaDMV {
     val convergence =
       if(opts.has( "convergence" )) opts.valueOf( "convergence").toString.toDouble else 0.00001
 
-    val streamBBackoff = opts.has( "streamBBackoff" )
-
     val maxMarginalParse = opts.has( "maxMarginalParse" )
 
 
@@ -82,96 +77,66 @@ object VanillaDMV {
     println( "vbEM: " + vbEM )
     println( "minIter: " + minIter )
     println( "convergence: " + convergence )
-    println( "streamBBackoff: " + streamBBackoff )
     println( "maxMarginalParse: " + maxMarginalParse )
 
-    //val unkCutoff = 5
 
     print( "Reading in training set...." )
-    val findRareWords = collection.mutable.Map[ObservedLabel,Int]();
+    val findRareWords = collection.mutable.Map[WordPair,Int]();
     var trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
       ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s, t ) =>
-        // if( streamBBackoff ) {
-        //   val wordParts = s.split( "#" );
+        val wordParts = s.split( "#" );
 
-        //   val wp = WordPair( wordParts(0), wordParts(1) )
+        val wp = WordPair( wordParts(0), wordParts(1) )
 
-        //   findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
+        findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
 
-        //   new TimedWordPair( wordParts(0), wordParts(1), t)
-        // } else {
-          findRareWords( Word(s) ) = 1 + findRareWords.getOrElse( Word(s), 0 )
-          new TimedWord(s,t)
-        //}
+        new TimedWordPair( wordParts(0), wordParts(1), t)
       }.toList
     }
     trainSet = trainSet.map( s =>
-      //if( streamBBackoff ) {
-      //  s.map{ case TimedWordPair( w1, w2, t ) =>
-      //    if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-      //      //new TimedWordPair( "UNK", w2, t )
-      //      new TimedWord( w2, t )
-      //    else
-      //      new TimedWordPair( w1, w2, t )
-      //  }
-      //} else {
-        s.map{ case TimedWord( w, t ) =>
-          if( findRareWords( Word( w ) ) <= unkCutoff )
-            if( streamBBackoff )
-              new TimedWord( w.split("#")(1), t )
-            else
-              new TimedWord( "UNK", t )
-          else
-            new TimedWord( w, t )
-        }
-      //}
+      s.map{ case TimedWordPair( w1, w2, t ) =>
+        if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
+          new TimedWordPair( "UNK", w2, t )
+        else
+          new TimedWordPair( w1, w2, t )
+      }
     )
     println( " Done; " + trainSet.size + " training set strings" )
-
-    // println( "training set is:\n" )
-    // println(
-    //   trainSet.map(_.mkString(""," ","")).mkString("","\n","\n")
-    // )
-    // println( "\n\n" )
 
     print( "Reading in test set...." )
     val testSet = io.Source.fromFile( testStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
-      TimedSentence(
+      TimedTwoStreamSentence(
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
-          // if( streamBBackoff ) {
-          //   val wordParts = s.split( "#" );
-          //   val wp = WordPair( wordParts(0), wordParts(1) )
 
-          //   if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
-          //     println( "Considering " + wp + " as UNK" )
+          val wordParts = s.split( "#" );
+          val wp = WordPair( wordParts(0), wordParts(1) )
 
-          //     new TimedWord( wordParts(1), t )
+          if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
+            println( "Considering " + wp + " as UNK" )
 
-          //   } else {
-          //     new TimedWordPair( wordParts(0), wordParts(1), t)
-          //   }
-          // } else {
-            if( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) {
-              println( "Considering " + s + " as UNK" )
-              if( streamBBackoff )
-                new TimedWord( s.split("#")(1), t )
-              else
-                new TimedWord( "UNK", t )
-            } else {
-              new TimedWord(s,t)
-            }
-          //}
+            new TimedWordPair( "UNK", wordParts(1), t )
+
+          } else {
+            new TimedWordPair( wordParts(0), wordParts(1), t)
+          }
         }.toList
       )
     }
     println( " Done; " + testSet.size + " test set strings" )
 
-    val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
+    val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp} }.toSet
 
-    val estimator = new VanillaDMVEstimator
+    // This is the magic line... it should be enough to get this estimator relying on two stream
+    // heads and stream A args...
+    val estimator = new VanillaDMVEstimator {//( vocab )
+      override val g = new DMVTwoStreamDepsGrammar
+    }
+    //estimator.set
+
+    //estimator.setGrammar( new DMVTwoStreamHeadsGrammar ) //( vocab ) )
 
     //val initialGrammar =
     print( "Initializing harmonic grammar..." )
@@ -203,6 +168,11 @@ object VanillaDMV {
         viterbiParser.setGrammar( estimator.g )
         println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       }
+      // val viterbiParser = new VanillaDMVParser {
+      // override val g = new DMVTwoStreamStopGrammar
+      // }
+      // viterbiParser.setGrammar( estimator.g )
+      // println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       // println(
       //   viterbiParser.dependencyParse( testSet ).mkString(
       //     "initial:dependency:", "\ninitial:dependency:", "\n" )
@@ -218,7 +188,6 @@ object VanillaDMV {
     var iter = 0
 
     println( "Beginning EM" )
-    //while( deltaLogProb > 0.00001 || deltaLogProb == (0D/0D) || iter < 10 ) {
     while(
       math.abs( deltaLogProb ) > convergence ||
       deltaLogProb == (0D/0D) ||
@@ -230,16 +199,14 @@ object VanillaDMV {
 
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
-      //val newGrammar = newPC.toDMVGrammar
       val newGrammar =
-        if( vbEM > 0 ) {
-          println( "VB grammar" )
+        if( vbEM > 0 )
           newPC.toVariationalDMVGrammar( vbEM )
-        } else {
-          println( "MLE grammar" )
+        else
           newPC.toDMVGrammar
-        }
-      // println( "newGrammar:\n" + newGrammar )
+
+      // println( "New grammar:\n\n" )
+      // println( newGrammar )
 
       estimator.setGrammar( newGrammar )
 
@@ -247,15 +214,15 @@ object VanillaDMV {
         val iterLabel = "it" + iter
         Actor.spawn {
           if( maxMarginalParse ) {
-            val viterbiParser = new VanillaDMVEstimator
-            viterbiParser.setGrammar( estimator.g )
+            val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
             println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            val viterbiParser = new VanillaDMVParser
-            viterbiParser.setGrammar( estimator.g )
+            val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
             println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
-          // val viterbiParser = new VanillaDMVParser
+          // val viterbiParser = new VanillaDMVParser {
+          //   override val g = new DMVTwoStreamStopGrammar
+          // }
           // viterbiParser.setGrammar( newGrammar )
           // println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
 
@@ -271,20 +238,18 @@ object VanillaDMV {
 
     println( "Final grammar:\n" + estimator.g )
 
-    // val viterbiParser = new VanillaDMVParser
-    // viterbiParser.setGrammar( estimator.g )
-    // println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
-
     if( maxMarginalParse ) {
-      val viterbiParser = new VanillaDMVEstimator
-      viterbiParser.setGrammar( estimator.g )
+      val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser
-      viterbiParser.setGrammar( estimator.g )
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
-
+    // val viterbiParser = new VanillaDMVParser {
+    //   override val g = new DMVTwoStreamStopGrammar
+    // }
+    // viterbiParser.setGrammar( estimator.g )
+    // println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
     // println( viterbiParser.dependencyParse( testSet ).mkString(
     //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     // println( viterbiParser.constituencyParse( testSet ).mkString(

@@ -23,6 +23,7 @@ object DMVTwoStreamHeads {
     optsParser.accepts( "initialGrammar" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
     optsParser.accepts( "unkCutoff" ).withRequiredArg
+    optsParser.accepts( "maxMarginalParse" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -52,6 +53,7 @@ object DMVTwoStreamHeads {
     val unkCutoff =
       if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
 
+    val maxMarginalParse = opts.has( "maxMarginalParse" )
 
     println( "trainStrings: " + trainStrings )
     println( "grammarInitialization: " + grammarInitialization )
@@ -63,6 +65,7 @@ object DMVTwoStreamHeads {
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoff: " + unkCutoff )
+    println( "maxMarginalParse: " + maxMarginalParse )
 
     print( "Reading in training set...." )
     val findRareWords = collection.mutable.Map[WordPair,Int]();
@@ -151,11 +154,18 @@ object DMVTwoStreamHeads {
     // viterbiParser.setGrammar( estimator.g )
 
     Actor.spawn{
-      val viterbiParser = new VanillaDMVParser {
-        override val g = new DMVTwoStreamHeadsGrammar
+      if( maxMarginalParse ) {
+        val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
+        println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
+      } else {
+        val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+        println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       }
-      viterbiParser.setGrammar( estimator.g )
-      println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
+      // val viterbiParser = new VanillaDMVParser {
+      //   override val g = new DMVTwoStreamHeadsGrammar
+      // }
+      // viterbiParser.setGrammar( estimator.g )
+      // println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       // println(
       //   viterbiParser.dependencyParse( testSet ).mkString(
       //     "initial:dependency:", "\ninitial:dependency:", "\n" )
@@ -184,11 +194,18 @@ object DMVTwoStreamHeads {
       if( iter%evalFreq == 0 ) {
         val iterLabel = "it" + iter
         Actor.spawn {
-          val viterbiParser = new VanillaDMVParser {
-            override val g = new DMVTwoStreamHeadsGrammar
+          if( maxMarginalParse ) {
+            val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
+            println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+          } else {
+            val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+            println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
-          viterbiParser.setGrammar( newGrammar )
-          println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+          // val viterbiParser = new VanillaDMVParser {
+          //   override val g = new DMVTwoStreamHeadsGrammar
+          // }
+          // viterbiParser.setGrammar( newGrammar )
+          // println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
 
           // println( viterbiParser.dependencyParse( testSet ).mkString(
           //   iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
@@ -202,11 +219,19 @@ object DMVTwoStreamHeads {
 
     println( "Final grammar:\n" + estimator.g )
 
-    val viterbiParser = new VanillaDMVParser {
-      override val g = new DMVTwoStreamHeadsGrammar
+    if( maxMarginalParse ) {
+      val viterbiParser = new VanillaDMVEstimator { override val g = estimator.g }
+      println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else {
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+      println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
-    viterbiParser.setGrammar( estimator.g )
-    println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
+
+    // val viterbiParser = new VanillaDMVParser {
+    //   override val g = new DMVTwoStreamHeadsGrammar
+    // }
+    // viterbiParser.setGrammar( estimator.g )
+    // println( viterbiParser.bothParses(testSet, "convergence" ).mkString("\n", "\n", "\n"))
     // println( viterbiParser.dependencyParse( testSet ).mkString(
     //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     // println( viterbiParser.constituencyParse( testSet ).mkString(
