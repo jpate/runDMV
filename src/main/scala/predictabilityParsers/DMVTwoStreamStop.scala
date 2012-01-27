@@ -25,7 +25,9 @@ object DMVTwoStreamStop {
     optsParser.accepts( "vbEM" ).withRequiredArg
     optsParser.accepts( "convergence" ).withRequiredArg
     optsParser.accepts( "minIter" ).withRequiredArg
+    optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "maxMarginalParse" )
+    optsParser.accepts( "babySteps" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -62,8 +64,11 @@ object DMVTwoStreamStop {
     val convergence =
       if(opts.has( "convergence" )) opts.valueOf( "convergence").toString.toDouble else 0.00001
 
+    val streamBBackoff = opts.has( "streamBBackoff" )
+
     val maxMarginalParse = opts.has( "maxMarginalParse" )
 
+    val babySteps = if( opts.has( "babySteps" ) ) 0.00001D else 0.0D
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -78,6 +83,8 @@ object DMVTwoStreamStop {
     println( "minIter: " + minIter )
     println( "convergence: " + convergence )
     println( "maxMarginalParse: " + maxMarginalParse )
+    println( "streamBBackoff: " + streamBBackoff )
+    println( "babySteps: " + babySteps )
 
 
     print( "Reading in training set...." )
@@ -97,7 +104,10 @@ object DMVTwoStreamStop {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-          new TimedWordPair( "UNK", w2, t )
+          if( streamBBackoff )
+            new TimedWordPair( w2, w2, t )
+          else
+            new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
       }
@@ -117,7 +127,10 @@ object DMVTwoStreamStop {
           if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
-            new TimedWordPair( "UNK", wordParts(1), t )
+            if( streamBBackoff )
+              new TimedWordPair( wordParts(1), wordParts(1), t )
+            else
+              new TimedWordPair( "UNK", wordParts(1), t )
 
           } else {
             new TimedWordPair( wordParts(0), wordParts(1), t)
@@ -187,13 +200,22 @@ object DMVTwoStreamStop {
     var lastCorpusLogProb = 1D
     var iter = 0
 
+    var thisIterMaxSentLength = 3
+    val longestSentence = trainSet.map{ _.length}.sortWith( _ > _).head
+
+    var thisIterTrain =
+      if( babySteps == 0D )
+        trainSet
+      else
+        trainSet.filter{ _.length <= thisIterMaxSentLength }
+
     println( "Beginning EM" )
     while(
       math.abs( deltaLogProb ) > convergence ||
       deltaLogProb == (0D/0D) ||
       iter < minIter
     ) {
-      val newPC = estimator.computePartialCounts( trainSet )
+      val newPC = estimator.computePartialCounts( thisIterTrain )
       val corpusLogProb = newPC.getTotalScore
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
@@ -202,6 +224,8 @@ object DMVTwoStreamStop {
       val newGrammar =
         if( vbEM > 0 )
           newPC.toVariationalDMVGrammar( vbEM )
+        else if( babySteps > 0 )
+          newPC.toLaplaceSmoothedGrammar( vocab, babySteps )
         else
           newPC.toDMVGrammar
 
@@ -233,6 +257,25 @@ object DMVTwoStreamStop {
           // println( viterbiParser.constituencyParse( testSet ).mkString(
           //   iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
         }
+      }
+
+      if(
+        math.abs( deltaLogProb ) <= convergence &&
+        babySteps > 0D &&
+        thisIterMaxSentLength < longestSentence
+      ) {
+        println(
+          "Jumping from maxlength of " + thisIterMaxSentLength + " to " + (thisIterMaxSentLength+1)
+        )
+        thisIterMaxSentLength += 1
+        thisIterTrain = trainSet.filter{ _.length <= thisIterMaxSentLength }
+
+        //estimator.g.laplaceSmooth( thisIterTrain.flatMap{ _.toSet}.toSet, babySteps )
+
+        //println( "New Grammar:\n" + estimator.g )
+
+        deltaLogProb = 1D
+        lastCorpusLogProb = 1D
       }
       iter += 1
       lastCorpusLogProb = corpusLogProb

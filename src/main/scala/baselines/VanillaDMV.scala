@@ -27,6 +27,8 @@ object VanillaDMV {
     optsParser.accepts( "minIter" ).withRequiredArg
     optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "maxMarginalParse" )
+    optsParser.accepts( "babySteps" )
+    optsParser.accepts( "slidingBabySteps" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -69,6 +71,10 @@ object VanillaDMV {
 
     val maxMarginalParse = opts.has( "maxMarginalParse" )
 
+    val babySteps = if( opts.has( "babySteps" ) ) 0.00001D else 0.0D
+
+    val slidingBabySteps = if( opts.has( "slidingBabySteps" ) ) 25 else 0
+
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -84,6 +90,8 @@ object VanillaDMV {
     println( "convergence: " + convergence )
     println( "streamBBackoff: " + streamBBackoff )
     println( "maxMarginalParse: " + maxMarginalParse )
+    println( "babySteps: " + babySteps )
+    println( "slidingBabySteps: " + slidingBabySteps )
 
     //val unkCutoff = 5
 
@@ -107,15 +115,6 @@ object VanillaDMV {
       }.toList
     }
     trainSet = trainSet.map( s =>
-      //if( streamBBackoff ) {
-      //  s.map{ case TimedWordPair( w1, w2, t ) =>
-      //    if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-      //      //new TimedWordPair( "UNK", w2, t )
-      //      new TimedWord( w2, t )
-      //    else
-      //      new TimedWordPair( w1, w2, t )
-      //  }
-      //} else {
         s.map{ case TimedWord( w, t ) =>
           if( findRareWords( Word( w ) ) <= unkCutoff )
             if( streamBBackoff )
@@ -125,7 +124,6 @@ object VanillaDMV {
           else
             new TimedWord( w, t )
         }
-      //}
     )
     println( " Done; " + trainSet.size + " training set strings" )
 
@@ -217,6 +215,27 @@ object VanillaDMV {
     var lastCorpusLogProb = 1D
     var iter = 0
 
+    var thisIterMaxSentLength = 3
+    val longestSentence = trainSet.map{ _.length}.sortWith( _ > _).head
+    var slidingWindowLength:Int = 1
+
+    var thisIterTrain =
+      if( babySteps > 0D )
+        trainSet.filter{ _.length <= thisIterMaxSentLength }
+      else if( slidingBabySteps > 0 )
+        trainSet.flatMap{ s =>
+          if( s.length <= slidingWindowLength )
+            s::Nil
+          else
+            (0 to (s.length- slidingWindowLength) ).map{ i =>
+              s.slice( i, i+slidingWindowLength )
+            }
+          }
+        //trainSet.flatten
+      else
+        trainSet
+
+
     println( "Beginning EM" )
     //while( deltaLogProb > 0.00001 || deltaLogProb == (0D/0D) || iter < 10 ) {
     while(
@@ -224,7 +243,8 @@ object VanillaDMV {
       deltaLogProb == (0D/0D) ||
       iter < minIter
     ) {
-      val newPC = estimator.computePartialCounts( trainSet )
+      //val newPC = estimator.computePartialCounts( trainSet )
+      val newPC = estimator.computePartialCounts( thisIterTrain )
       val corpusLogProb = newPC.getTotalScore
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
@@ -235,6 +255,13 @@ object VanillaDMV {
         if( vbEM > 0 ) {
           println( "VB grammar" )
           newPC.toVariationalDMVGrammar( vbEM )
+        } else if( babySteps > 0 ) {
+          println( "Baby steps grammar" )
+          newPC.toLaplaceSmoothedGrammar( vocab, babySteps )
+        } else if( slidingBabySteps > 0 ) {
+          println( "sliding baby steps grammar" )
+          //newPC.toLaplaceSmoothedGrammar( vocab, 0.00001D )
+          newPC.toDMVGrammar
         } else {
           println( "MLE grammar" )
           newPC.toDMVGrammar
@@ -255,18 +282,86 @@ object VanillaDMV {
             viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
-          // val viterbiParser = new VanillaDMVParser
-          // viterbiParser.setGrammar( newGrammar )
-          // println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
-
-          // println( viterbiParser.dependencyParse( testSet ).mkString(
-          //   iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
-          // println( viterbiParser.constituencyParse( testSet ).mkString(
-          //   iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
         }
       }
       iter += 1
       lastCorpusLogProb = corpusLogProb
+
+      if(
+        math.abs( deltaLogProb ) <= convergence &&
+        thisIterMaxSentLength < longestSentence
+      ) {
+        if( babySteps > 0D ) {
+          println(
+            "Jumping from maxlength of " + thisIterMaxSentLength + " to " + (thisIterMaxSentLength+1)
+          )
+          thisIterMaxSentLength += 1
+          thisIterTrain = trainSet.filter{ _.length <= thisIterMaxSentLength }
+
+          val iterLabel = "sentence"+slidingWindowLength+"Converged"
+          Actor.spawn {
+            if( maxMarginalParse ) {
+              val viterbiParser = new VanillaDMVEstimator
+              viterbiParser.setGrammar( estimator.g )
+              println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            } else {
+              val viterbiParser = new VanillaDMVParser
+              viterbiParser.setGrammar( estimator.g )
+              println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            }
+          }
+
+          // estimator.g.laplaceSmooth( thisIterTrain.flatMap{ _.toSet}.toSet, babySteps )
+
+          //println( "New Grammar:\n" + estimator.g )
+
+          deltaLogProb = 1D
+          lastCorpusLogProb = 1D
+        } else if( slidingBabySteps > 0 && slidingWindowLength < slidingBabySteps) {
+          println( estimator.g )
+          println(
+            "Jumping from sliding window size of " + slidingWindowLength +
+              " to " + (slidingWindowLength+1)
+          )
+
+          val iterLabel = "window"+slidingWindowLength+"Converged"
+          Actor.spawn {
+            if( maxMarginalParse ) {
+              val viterbiParser = new VanillaDMVEstimator
+              viterbiParser.setGrammar( estimator.g )
+              println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+            } else {
+              val viterbiParser = new VanillaDMVParser
+              viterbiParser.setGrammar( estimator.g )
+              println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+            }
+          }
+
+          slidingWindowLength += 1
+          thisIterTrain = trainSet.flatMap{ s =>
+            if( s.length <= slidingWindowLength )
+              s::Nil
+            else
+              (0 to (s.length - slidingWindowLength) ).map{ i =>
+                s.slice( i, i+slidingWindowLength )
+              }
+          }
+
+          println( "New training set contains " + thisIterTrain.size + " items" )
+
+          estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
+
+          //println( estimator.g.stopScore( estimator.g.p_stop.parents.head , Stop) )
+          // println( "\n\n\nAFTER SMOOTHING\n\n\n" )
+          // println( estimator.g )
+          // println( estimator.g.stopScore( estimator.g.p_stop.parents.head , Stop) )
+
+          // println( thisIterTrain.flatten.toSet.mkString( "\t\t","\n\t\t","\n\n-----\n\n" ) )
+
+          deltaLogProb = 1D
+          lastCorpusLogProb = 1D
+        }
+      }
     }
 
     println( "Final grammar:\n" + estimator.g )

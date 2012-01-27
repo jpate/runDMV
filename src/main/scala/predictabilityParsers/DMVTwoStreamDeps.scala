@@ -1,3 +1,4 @@
+/*
 package runDMV.predictabilityParsers
 
 import akka.actor.Actor
@@ -25,6 +26,7 @@ object DMVTwoStreamDeps {
     optsParser.accepts( "vbEM" ).withRequiredArg
     optsParser.accepts( "convergence" ).withRequiredArg
     optsParser.accepts( "minIter" ).withRequiredArg
+    optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "maxMarginalParse" )
 
     val opts = optsParser.parse( args:_* )
@@ -62,6 +64,8 @@ object DMVTwoStreamDeps {
     val convergence =
       if(opts.has( "convergence" )) opts.valueOf( "convergence").toString.toDouble else 0.00001
 
+    val streamBBackoff = opts.has( "streamBBackoff" )
+
     val maxMarginalParse = opts.has( "maxMarginalParse" )
 
 
@@ -78,6 +82,7 @@ object DMVTwoStreamDeps {
     println( "minIter: " + minIter )
     println( "convergence: " + convergence )
     println( "maxMarginalParse: " + maxMarginalParse )
+    println( "streamBBackoff: " + streamBBackoff )
 
 
     print( "Reading in training set...." )
@@ -97,7 +102,10 @@ object DMVTwoStreamDeps {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-          new TimedWordPair( "UNK", w2, t )
+          if( streamBBackoff )
+            new TimedWordPair( w2, w2, t )
+          else
+            new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
       }
@@ -117,7 +125,10 @@ object DMVTwoStreamDeps {
           if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
-            new TimedWordPair( "UNK", wordParts(1), t )
+            if( streamBBackoff )
+              new TimedWordPair( wordParts(1), wordParts(1), t )
+            else
+              new TimedWordPair( "UNK", wordParts(1), t )
 
           } else {
             new TimedWordPair( wordParts(0), wordParts(1), t)
@@ -257,3 +268,4 @@ object DMVTwoStreamDeps {
 }
 
 
+*/

@@ -21,6 +21,7 @@ object DMVIndependentStreamHeads {
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
+    optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "unkCutoff" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
@@ -49,6 +50,7 @@ object DMVIndependentStreamHeads {
     val unkCutoff =
       if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 1
 
+    val streamBBackoff = opts.has( "streamBBackoff" )
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -59,6 +61,7 @@ object DMVIndependentStreamHeads {
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoff: " + unkCutoff )
+    println( "streamBBackoff: " + streamBBackoff )
 
 
     print( "Reading in training set...." )
@@ -78,7 +81,10 @@ object DMVIndependentStreamHeads {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-          new TimedWordPair( "UNK", w2, t )
+          if( streamBBackoff )
+            new TimedWordPair( w2, w2, t )
+          else
+            new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
       }
@@ -98,7 +104,10 @@ object DMVIndependentStreamHeads {
           if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
-            new TimedWordPair( "UNK", wordParts(1), t )
+            if( streamBBackoff )
+              new TimedWordPair( wordParts(1), wordParts(1), t )
+            else
+              new TimedWordPair( "UNK", wordParts(1), t )
 
           } else {
             new TimedWordPair( wordParts(0), wordParts(1), t)
