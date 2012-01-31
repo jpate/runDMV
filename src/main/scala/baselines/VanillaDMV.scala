@@ -270,7 +270,7 @@ object VanillaDMV {
 
       estimator.setGrammar( newGrammar )
 
-      if( iter%evalFreq == 0 ) {
+      if( iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
         Actor.spawn {
           if( maxMarginalParse ) {
@@ -317,25 +317,25 @@ object VanillaDMV {
 
           deltaLogProb = 1D
           lastCorpusLogProb = 1D
-        } else if( slidingBabySteps > 0 && slidingWindowLength < slidingBabySteps) {
-          println( estimator.g )
+        } else if( slidingBabySteps > 0 && slidingWindowLength < longestSentence) {
           println(
             "Jumping from sliding window size of " + slidingWindowLength +
               " to " + (slidingWindowLength+1)
           )
 
           val iterLabel = "window"+slidingWindowLength+"Converged"
-          Actor.spawn {
-            if( maxMarginalParse ) {
-              val viterbiParser = new VanillaDMVEstimator
-              viterbiParser.setGrammar( estimator.g )
-              println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
-            } else {
-              val viterbiParser = new VanillaDMVParser
-              viterbiParser.setGrammar( estimator.g )
-              println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+          if( slidingWindowLength % evalFreq == 0 )
+            Actor.spawn {
+              if( maxMarginalParse ) {
+                val viterbiParser = new VanillaDMVEstimator
+                viterbiParser.setGrammar( estimator.g )
+                println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+              } else {
+                val viterbiParser = new VanillaDMVParser
+                viterbiParser.setGrammar( estimator.g )
+                println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+              }
             }
-          }
 
           slidingWindowLength += 1
           thisIterTrain = trainSet.flatMap{ s =>

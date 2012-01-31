@@ -5,10 +5,10 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
-import predictabilityParsing.grammars.DMVTwoStreamStopGrammar
+import predictabilityParsing.grammars.DMVBayesianBackoffGrammar
 import predictabilityParsing.types.labels._
 
-object DMVTwoStreamStop {
+object DMVBayesianBackoff {
   def main( args:Array[String]) {
 
     val optsParser = new OptionParser()
@@ -22,10 +22,8 @@ object DMVTwoStreamStop {
     optsParser.accepts( "stopUniformity" ).withRequiredArg
     optsParser.accepts( "evalFreq" ).withRequiredArg
     optsParser.accepts( "unkCutoff" ).withRequiredArg
-    optsParser.accepts( "vbEM" ).withRequiredArg
     optsParser.accepts( "convergence" ).withRequiredArg
     optsParser.accepts( "minIter" ).withRequiredArg
-    optsParser.accepts( "streamBBackoff" )
     optsParser.accepts( "maxMarginalParse" )
     optsParser.accepts( "babySteps" )
     optsParser.accepts( "slidingBabySteps" )
@@ -56,16 +54,11 @@ object DMVTwoStreamStop {
     val unkCutoff =
       if(opts.has( "unkCutoff" )) opts.valueOf( "unkCutoff" ).toString.toInt else 5
 
-    val vbEM =
-      if(opts.has( "vbEM" )) opts.valueOf( "vbEM" ).toString.toDouble else 0D
-
     val minIter =
       if(opts.has( "minIter" )) opts.valueOf( "minIter" ).toString.toDouble else 1D
 
     val convergence =
       if(opts.has( "convergence" )) opts.valueOf( "convergence").toString.toDouble else 0.00001
-
-    val streamBBackoff = opts.has( "streamBBackoff" )
 
     val maxMarginalParse = opts.has( "maxMarginalParse" )
 
@@ -82,11 +75,9 @@ object DMVTwoStreamStop {
     println( "stopUniformity: " + stopUniformity )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoff: " + unkCutoff )
-    println( "vbEM: " + vbEM )
     println( "minIter: " + minIter )
     println( "convergence: " + convergence )
     println( "maxMarginalParse: " + maxMarginalParse )
-    println( "streamBBackoff: " + streamBBackoff )
     println( "babySteps: " + babySteps )
     println( "slidingBabySteps: " + slidingBabySteps )
 
@@ -108,10 +99,7 @@ object DMVTwoStreamStop {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         if( findRareWords( WordPair( w1, w2 ) ) <= unkCutoff )
-          if( streamBBackoff )
-            new TimedWordPair( w2, w2, t )
-          else
-            new TimedWordPair( "UNK", w2, t )
+          new TimedWordPair( "UNK", w2, t )
         else
           new TimedWordPair( w1, w2, t )
       }
@@ -131,10 +119,7 @@ object DMVTwoStreamStop {
           if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
             println( "Considering " + wp + " as UNK" )
 
-            if( streamBBackoff )
-              new TimedWordPair( wordParts(1), wordParts(1), t )
-            else
-              new TimedWordPair( "UNK", wordParts(1), t )
+            new TimedWordPair( "UNK", wordParts(1), t )
 
           } else {
             new TimedWordPair( wordParts(0), wordParts(1), t)
@@ -149,7 +134,7 @@ object DMVTwoStreamStop {
     // This is the magic line... it should be enough to get this estimator relying on two stream
     // heads and stream A args...
     val estimator = new VanillaDMVEstimator {//( vocab )
-      override val g = new DMVTwoStreamStopGrammar
+      override val g = new DMVBayesianBackoffGrammar
     }
     //estimator.set
 
@@ -243,13 +228,11 @@ object DMVTwoStreamStop {
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
       val newGrammar =
-        if( vbEM > 0 ) {
-          newPC.toVariationalDMVGrammar( vbEM )
-        } else if( babySteps > 0 ) {
-          newPC.toLaplaceSmoothedGrammar( vocab, babySteps )
+        if( babySteps > 0 ) {
+          println( "baby steps grammar" )
+          newPC.toDMVGrammar
         } else if( slidingBabySteps > 0 ) {
           println( "sliding baby steps grammar" )
-          //newPC.toLaplaceSmoothedGrammar( vocab, 0.00001D )
           newPC.toDMVGrammar
         } else {
           newPC.toDMVGrammar
