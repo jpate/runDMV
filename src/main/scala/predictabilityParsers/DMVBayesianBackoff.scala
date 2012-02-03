@@ -15,6 +15,7 @@ object DMVBayesianBackoff {
 
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
+    optsParser.accepts( "grammarInit" ).withRequiredArg
     optsParser.accepts( "rightFirst" ).withRequiredArg
     optsParser.accepts( "cAttach" ).withRequiredArg
     optsParser.accepts( "cStop" ).withRequiredArg
@@ -32,6 +33,9 @@ object DMVBayesianBackoff {
 
     val trainStrings = opts.valueOf( "trainStrings" ).toString
     val testStrings = opts.valueOf( "testStrings" ).toString
+
+    val grammarInit =
+      if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -68,6 +72,7 @@ object DMVBayesianBackoff {
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
+    println( "grammarInit: " + grammarInit )
     println( "rightFirst: " + rightFirst )
     println( "cAttach: " + cAttach )
     println( "cStop: " + cStop )
@@ -140,16 +145,21 @@ object DMVBayesianBackoff {
 
     //estimator.setGrammar( new DMVTwoStreamHeadsGrammar ) //( vocab ) )
 
-    //val initialGrammar =
-    print( "Initializing harmonic grammar..." )
-    estimator.setHarmonicGrammar(
-      trainSet,
-      rightFirst = rightFirst,
-      cAttach = cAttach,
-      cStop = cStop,
-      cNotStop = cNotStop,
-      stopUniformity = stopUniformity
-    )
+    val initialGrammar =
+      if( grammarInit == "harmonic" ) {
+        print( "Initializing harmonic grammar..." )
+        estimator.setHarmonicGrammar(
+          trainSet,
+          rightFirst = rightFirst,
+          cAttach = cAttach,
+          cStop = cStop,
+          cNotStop = cNotStop,
+          stopUniformity = stopUniformity
+        )
+      } else {
+        print( "Initializing random grammar..." )
+        estimator.g.randomize(vocab)
+      }
 
     println( " done" )
 
@@ -160,36 +170,24 @@ object DMVBayesianBackoff {
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )
 
-    Actor.spawn{
-      if( maxMarginalParse ) {
-        val viterbiParser = new VanillaDMVEstimator
-        viterbiParser.setGrammar( estimator.g )
-        println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
-      } else {
+    if( maxMarginalParse ) {
+      val viterbiParser = new VanillaDMVEstimator
+      viterbiParser.setGrammar( estimator.g )
+      println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
+    } else {
+      Actor.spawn{
         val viterbiParser = new VanillaDMVParser
         viterbiParser.setGrammar( estimator.g )
         println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
       }
-      // val viterbiParser = new VanillaDMVParser {
-      // override val g = new DMVTwoStreamStopGrammar
-      // }
-      // viterbiParser.setGrammar( estimator.g )
-      // println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
-      // println(
-      //   viterbiParser.dependencyParse( testSet ).mkString(
-      //     "initial:dependency:", "\ninitial:dependency:", "\n" )
-      // )
-      // println(
-      //   viterbiParser.constituencyParse( testSet ).mkString(
-      //     "initial:constituency:", "\ninitial:constituency:", "\n" )
-      // )
     }
 
     var deltaLogProb = 1D
     var lastCorpusLogProb = 1D
     var iter = 0
 
-    var thisIterMaxSentLength = 3
+    //var thisIterMaxSentLength = 3
+    var thisIterMaxSentLength = trainSet.map{ _.length}.sortWith( _ < _).head
     val longestSentence = trainSet.map{ _.length}.sortWith( _ > _).head
     var slidingWindowLength:Int = 1
 
@@ -245,15 +243,17 @@ object DMVBayesianBackoff {
 
       if( iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
-        Actor.spawn {
+        //Actor.spawn {
           if( maxMarginalParse ) {
             val viterbiParser = new VanillaDMVEstimator
             viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            val viterbiParser = new VanillaDMVParser
-            viterbiParser.setGrammar( estimator.g )
-            println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            Actor.spawn{
+              val viterbiParser = new VanillaDMVParser
+              viterbiParser.setGrammar( estimator.g )
+              println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            }
           }
           // val viterbiParser = new VanillaDMVParser {
           //   override val g = new DMVTwoStreamStopGrammar
@@ -266,7 +266,7 @@ object DMVBayesianBackoff {
           // println( viterbiParser.constituencyParse( testSet ).mkString(
           //   iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
         }
-      }
+      //}
 
       if(
         math.abs( deltaLogProb ) <= convergence &&
@@ -280,6 +280,7 @@ object DMVBayesianBackoff {
           thisIterTrain = trainSet.filter{ _.length <= thisIterMaxSentLength }
 
           //estimator.g.laplaceSmooth( thisIterTrain.flatMap{ _.toSet}.toSet, babySteps )
+          //estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
 
           //println( "New Grammar:\n" + estimator.g )
 
@@ -292,12 +293,13 @@ object DMVBayesianBackoff {
           )
 
           val iterLabel = "window"+slidingWindowLength+"Converged"
-          Actor.spawn {
-            if( maxMarginalParse ) {
-              val viterbiParser = new VanillaDMVEstimator
-              viterbiParser.setGrammar( estimator.g )
-              println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
-            } else {
+
+          if( maxMarginalParse ) {
+            val viterbiParser = new VanillaDMVEstimator
+            viterbiParser.setGrammar( estimator.g )
+            println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+          } else {
+            Actor.spawn {
               val viterbiParser = new VanillaDMVParser
               viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
@@ -316,7 +318,7 @@ object DMVBayesianBackoff {
 
           println( "New training set contains " + thisIterTrain.size + " items" )
 
-          estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
+          //estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
 
           //println( estimator.g.stopScore( estimator.g.p_stop.parents.head , Stop) )
           // println( "\n\n\nAFTER SMOOTHING\n\n\n" )
