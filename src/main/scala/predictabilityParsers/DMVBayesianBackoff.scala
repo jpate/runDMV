@@ -28,6 +28,11 @@ object DMVBayesianBackoff {
     optsParser.accepts( "maxMarginalParse" )
     optsParser.accepts( "babySteps" )
     optsParser.accepts( "slidingBabySteps" )
+    optsParser.accepts( "stopNoBackoffAlpha" ).withRequiredArg
+    optsParser.accepts( "stopBackoffAlpha" ).withRequiredArg
+    optsParser.accepts( "chooseNoBackoffAlpha" ).withRequiredArg
+    optsParser.accepts( "chooseBackoffArgAlpha" ).withRequiredArg
+    optsParser.accepts( "chooseBackoffBothAlpha" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -70,6 +75,26 @@ object DMVBayesianBackoff {
 
     val slidingBabySteps = if( opts.has( "slidingBabySteps" ) ) 25 else 0
 
+    val stopNoBackoffAlpha =
+      if( opts.has("stopNoBackoffAlpha") ) opts.valueOf( "stopNoBackoffAlpha").toString.toDouble
+      else 35D
+
+    val stopBackoffAlpha =
+      if( opts.has("stopBackoffAlpha") ) opts.valueOf( "stopBackoffAlpha").toString.toDouble
+      else 70D
+
+    val chooseNoBackoffAlpha =
+      if( opts.has("chooseNoBackoffAlpha") ) opts.valueOf( "chooseNoBackoffAlpha").toString.toDouble
+      else 30D
+
+    val chooseBackoffArgAlpha =
+      if( opts.has("chooseBackoffArgAlpha") ) opts.valueOf( "chooseBackoffArgAlpha").toString.toDouble
+      else 60D
+
+    val chooseBackoffBothAlpha =
+      if( opts.has("chooseBackoffBothAlpha") ) opts.valueOf( "chooseBackoffBothAlpha").toString.toDouble
+      else 120D
+
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
@@ -85,6 +110,11 @@ object DMVBayesianBackoff {
     println( "maxMarginalParse: " + maxMarginalParse )
     println( "babySteps: " + babySteps )
     println( "slidingBabySteps: " + slidingBabySteps )
+    println( "stopNoBackoffAlpha: " + stopNoBackoffAlpha )
+    println( "stopBackoffAlpha: " + stopBackoffAlpha )
+    println( "chooseNoBackoffAlpha: " + chooseNoBackoffAlpha )
+    println( "chooseBackoffArgAlpha: " + chooseBackoffArgAlpha )
+    println( "chooseBackoffBothAlpha: " + chooseBackoffBothAlpha )
 
 
     print( "Reading in training set...." )
@@ -139,7 +169,13 @@ object DMVBayesianBackoff {
     // This is the magic line... it should be enough to get this estimator relying on two stream
     // heads and stream A args...
     val estimator = new VanillaDMVEstimator {//( vocab )
-      override val g = new DMVBayesianBackoffGrammar
+      override val g = new DMVBayesianBackoffGrammar(
+        stopNoBackoffAlpha,
+        stopBackoffAlpha,
+        chooseNoBackoffAlpha,
+        chooseBackoffArgAlpha,
+        chooseBackoffBothAlpha
+      )
     }
     //estimator.set
 
@@ -171,9 +207,10 @@ object DMVBayesianBackoff {
     // viterbiParser.setGrammar( estimator.g )
 
     if( maxMarginalParse ) {
-      val viterbiParser = new VanillaDMVEstimator
-      viterbiParser.setGrammar( estimator.g )
-      println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
+      // val viterbiParser = new VanillaDMVEstimator {
+      //   override val g = estimator.g
+      // }
+      println( estimator.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
     } else {
       Actor.spawn{
         val viterbiParser = new VanillaDMVParser
@@ -245,9 +282,10 @@ object DMVBayesianBackoff {
         val iterLabel = "it" + iter
         //Actor.spawn {
           if( maxMarginalParse ) {
-            val viterbiParser = new VanillaDMVEstimator
-            viterbiParser.setGrammar( estimator.g )
-            println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            // val viterbiParser = new VanillaDMVEstimator {
+            //   override val g = estimator.g
+            // }
+            println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn{
               val viterbiParser = new VanillaDMVParser
@@ -295,9 +333,10 @@ object DMVBayesianBackoff {
           val iterLabel = "window"+slidingWindowLength+"Converged"
 
           if( maxMarginalParse ) {
-            val viterbiParser = new VanillaDMVEstimator
-            viterbiParser.setGrammar( estimator.g )
-            println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+            // val viterbiParser = new VanillaDMVEstimator {
+            //   override val g = estimator.g
+            // }
+            println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn {
               val viterbiParser = new VanillaDMVParser
@@ -337,10 +376,12 @@ object DMVBayesianBackoff {
 
     println( "Final grammar:\n" + estimator.g )
 
+
     if( maxMarginalParse ) {
-      val viterbiParser = new VanillaDMVEstimator
-      viterbiParser.setGrammar( estimator.g )
-      println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+      // val viterbiParser = new VanillaDMVEstimator {
+      //   override val g = estimator.g
+      // }
+      println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
       val viterbiParser = new VanillaDMVParser
       viterbiParser.setGrammar( estimator.g )
