@@ -153,7 +153,7 @@ object VanillaDMV {
           //   }
           // } else {
             if( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) {
-              println( "Considering " + s + " as UNK" )
+              //println( "Considering " + s + " as UNK" )
               if( streamBBackoff )
                 new TimedWord( s.split("#")(1), t )
               else
@@ -184,32 +184,32 @@ object VanillaDMV {
 
     println( " done" )
 
-    println( "Initial grammar:\n\n" )
-    println( estimator.g )
+    // println( "Initial grammar:\n\n" )
+    // println( estimator.g )
 
 
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )
 
-    Actor.spawn{
-      if( maxMarginalParse ) {
-        val viterbiParser = new VanillaDMVEstimator
-        viterbiParser.setGrammar( estimator.g )
-        println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
-      } else {
-        val viterbiParser = new VanillaDMVParser
-        viterbiParser.setGrammar( estimator.g )
-        println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
-      }
-      // println(
-      //   viterbiParser.dependencyParse( testSet ).mkString(
-      //     "initial:dependency:", "\ninitial:dependency:", "\n" )
-      // )
-      // println(
-      //   viterbiParser.constituencyParse( testSet ).mkString(
-      //     "initial:constituency:", "\ninitial:constituency:", "\n" )
-      // )
-    }
+    // Actor.spawn{
+    //   if( maxMarginalParse ) {
+    //     val viterbiParser = new VanillaDMVEstimator
+    //     viterbiParser.setGrammar( estimator.g )
+    //     println( viterbiParser.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
+    //   } else {
+    //     val viterbiParser = new VanillaDMVParser
+    //     viterbiParser.setGrammar( estimator.g )
+    //     println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
+    //   }
+    //   // println(
+    //   //   viterbiParser.dependencyParse( testSet ).mkString(
+    //   //     "initial:dependency:", "\ninitial:dependency:", "\n" )
+    //   // )
+    //   // println(
+    //   //   viterbiParser.constituencyParse( testSet ).mkString(
+    //   //     "initial:constituency:", "\ninitial:constituency:", "\n" )
+    //   // )
+    // }
 
     var deltaLogProb = 1D
     var lastCorpusLogProb = 1D
