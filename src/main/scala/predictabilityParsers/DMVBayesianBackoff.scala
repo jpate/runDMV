@@ -227,6 +227,10 @@ object DMVBayesianBackoff {
           cNotStop = cNotStop,
           stopUniformity = stopUniformity
         )
+      } else if ( grammarInit == "priors" ) {
+        print( "Init to priors..." )
+        estimator.g.setUniform(vocab)
+        //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
       } else {
         print( "Initializing random grammar..." )
         estimator.g.randomize(vocab)
@@ -265,9 +269,10 @@ object DMVBayesianBackoff {
 
     //var thisIterMaxSentLength = 3
     //var thisIterMaxSentLength = trainSet.map{ _.length}.sortWith( _ < _).head
-    val longestSentence = trainSet.map{ _.length}.sortWith( _ > _).head
+    val longestSentence = trainSet.map{ _.length}.max
+    val shortestSentenceLength = trainSet.map{ _.length}.min
     var slidingWindowLength:Int = 1
-    var thisIterMaxSentLength = 1
+    var thisIterMaxSentLength = shortestSentenceLength
 
     // var thisIterTrain =
     //   if( babySteps == 0D )
@@ -318,8 +323,8 @@ object DMVBayesianBackoff {
       // deltaFreeEnergy = ( ( lastGrammarFreeEnergy - newFreeEnergy ) / lastGrammarFreeEnergy )
       // println( "Free Energy G_" + iter + ": " + newFreeEnergy + " (" + deltaFreeEnergy + ")" )
 
-      println( "New grammar:\n\n" )
-      println( newGrammar )
+      // println( "New grammar:\n\n" )
+      // println( newGrammar )
 
       estimator.setGrammar( newGrammar )
 
