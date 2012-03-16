@@ -229,8 +229,8 @@ object DMVBayesianThreeStreamBackoff {
 
     println( " done" )
 
-    println( "Initial grammar:\n\n" )
-    println( estimator.g )
+    // println( "Initial grammar:\n\n" )
+    // println( estimator.g )
 
 
     // val viterbiParser = new VanillaDMVParser
@@ -319,7 +319,7 @@ object DMVBayesianThreeStreamBackoff {
 
       estimator.setGrammar( newGrammar )
 
-      if( iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
+      if( evalFreq != 0 && iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
         //Actor.spawn {
           if( maxMarginalParse ) {

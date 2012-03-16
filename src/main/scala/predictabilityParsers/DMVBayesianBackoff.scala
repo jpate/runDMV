@@ -328,7 +328,7 @@ object DMVBayesianBackoff {
 
       estimator.setGrammar( newGrammar )
 
-      if( iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
+      if( evalFreq != 0 && iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
         //Actor.spawn {
           if( maxMarginalParse ) {

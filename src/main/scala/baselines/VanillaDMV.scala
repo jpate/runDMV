@@ -15,6 +15,7 @@ object VanillaDMV {
 
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
+    optsParser.accepts( "grammarInit" ).withRequiredArg
     optsParser.accepts( "rightFirst" ).withRequiredArg
     optsParser.accepts( "cAttach" ).withRequiredArg
     optsParser.accepts( "cStop" ).withRequiredArg
@@ -36,6 +37,9 @@ object VanillaDMV {
     val testStrings = opts.valueOf( "testStrings" ).toString
     // val grammarInitialization =
     //   if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
+
+    val grammarInit =
+      if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "harmonic"
 
     val rightFirst =
       if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
@@ -78,6 +82,7 @@ object VanillaDMV {
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
+    println( "grammarInit: " + grammarInit )
     println( "rightFirst: " + rightFirst )
     println( "cAttach: " + cAttach )
     println( "cStop: " + cStop )
@@ -171,16 +176,37 @@ object VanillaDMV {
 
     val estimator = new VanillaDMVEstimator
 
-    //val initialGrammar =
-    print( "Initializing harmonic grammar..." )
-    estimator.setHarmonicGrammar(
-      trainSet,
-      rightFirst = rightFirst,
-      cAttach = cAttach,
-      cStop = cStop,
-      cNotStop = cNotStop,
-      stopUniformity = stopUniformity
-    )
+
+    val initialGrammar =
+      if( grammarInit == "harmonic" ) {
+        print( "Initializing harmonic grammar..." )
+        estimator.setHarmonicGrammar(
+          trainSet,
+          rightFirst = rightFirst,
+          cAttach = cAttach,
+          cStop = cStop,
+          cNotStop = cNotStop,
+          stopUniformity = stopUniformity
+        )
+      } else if ( grammarInit == "priors" ) {
+        print( "Init to priors..." )
+        estimator.g.setUniform(vocab)
+        //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
+      } else {
+        print( "Initializing random grammar..." )
+        estimator.g.randomize(vocab)
+      }
+
+    // //val initialGrammar =
+    // print( "Initializing harmonic grammar..." )
+    // estimator.setHarmonicGrammar(
+    //   trainSet,
+    //   rightFirst = rightFirst,
+    //   cAttach = cAttach,
+    //   cStop = cStop,
+    //   cNotStop = cNotStop,
+    //   stopUniformity = stopUniformity
+    // )
 
     println( " done" )
 
@@ -270,7 +296,7 @@ object VanillaDMV {
 
       estimator.setGrammar( newGrammar )
 
-      if( iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
+      if( evalFreq != 0 && iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
         Actor.spawn {
           if( maxMarginalParse ) {
