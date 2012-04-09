@@ -5,10 +5,10 @@ import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
-import predictabilityParsing.grammars.DMVBayesianBackoffGrammar
+import predictabilityParsing.grammars.DMVBothBayesianBackoffGrammar
 import predictabilityParsing.types.labels._
 
-object DMVBayesianBackoff {
+object DMVBothBayesianBackoff {
   def main( args:Array[String]) {
 
     val optsParser = new OptionParser()
@@ -154,7 +154,6 @@ object DMVBayesianBackoff {
         val wp = WordPair( wordParts(0), wordParts(1) )
 
         //findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
-        //findRareWords( Word( wordParts(0) ) ) = 1 + findRareWords.getOrElse( Word( wordParts(0) ), 0 )
         findRareWordsA( Word( wordParts(0) ) ) = 1 + findRareWordsA.getOrElse( Word( wordParts(0) ), 0 )
         findRareWordsB( Word( wordParts(1) ) ) = 1 + findRareWordsB.getOrElse( Word( wordParts(1) ), 0 )
 
@@ -227,7 +226,7 @@ object DMVBayesianBackoff {
     // This is the magic line... it should be enough to get this estimator relying on two stream
     // heads and stream A args...
     val estimator = new VanillaDMVEstimator {//( vocab )
-      override val g = new DMVBayesianBackoffGrammar(
+      override val g = new DMVBothBayesianBackoffGrammar(
         // stopNoBackoffAlpha,
         // stopBackoffAlpha,
         // chooseNoBackoffAlpha,
@@ -327,7 +326,6 @@ object DMVBayesianBackoff {
               s.slice( i, i+slidingWindowLength )
             }
           }
-        //trainSet.flatten
       else
         trainSet
 
@@ -342,9 +340,7 @@ object DMVBayesianBackoff {
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
-      println(
-        thisIterMaxSentLength + " max sent length producing " + thisIterTrain.size + " sentences"
-      )
+      println( thisIterTrain.size + " sentences" )
 
       val newGrammar =
         if( babySteps > 0 ) {
@@ -361,8 +357,7 @@ object DMVBayesianBackoff {
       // deltaFreeEnergy = ( ( lastGrammarFreeEnergy - newFreeEnergy ) / lastGrammarFreeEnergy )
       // println( "Free Energy G_" + iter + ": " + newFreeEnergy + " (" + deltaFreeEnergy + ")" )
 
-      // println( "New grammar:\n\n" )
-      // println( newGrammar )
+      // println( "New grammar:\n\n" + newGrammar )
 
       estimator.setGrammar( newGrammar )
 
@@ -408,7 +403,7 @@ object DMVBayesianBackoff {
           //estimator.g.laplaceSmooth( thisIterTrain.flatMap{ _.toSet}.toSet, babySteps )
           //estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
 
-          //println( "Grammar before jumping:\n" + estimator.g )
+          //println( "New Grammar:\n" + estimator.g )
 
           deltaLogProb = 1D
           lastCorpusLogProb = 1D

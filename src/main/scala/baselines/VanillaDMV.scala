@@ -16,7 +16,7 @@ object VanillaDMV {
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
     optsParser.accepts( "grammarInit" ).withRequiredArg
-    optsParser.accepts( "rightFirst" ).withRequiredArg
+    optsParser.accepts( "grammarInitMinLength" ).withRequiredArg
     optsParser.accepts( "cAttach" ).withRequiredArg
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
@@ -30,6 +30,7 @@ object VanillaDMV {
     optsParser.accepts( "maxMarginalParse" )
     optsParser.accepts( "babySteps" )
     optsParser.accepts( "slidingBabySteps" )
+    optsParser.accepts( "randomSeed" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -39,10 +40,11 @@ object VanillaDMV {
     //   if(opts.has("initialGrammar")) opts.valueOf("initialGrammar").toString else "harmonic"
 
     val grammarInit =
-      if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "harmonic"
+      if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "hardlineStopHarmonicGrammar"
 
-    val rightFirst =
-      if(opts.has( "rightFirst" )) opts.valueOf( "rightFirst" ).toString.toDouble else 0.75
+    val grammarInitMinLength =
+      if(opts.has( "grammarInitMinLength" )) opts.valueOf( "grammarInitMinLength" ).toString.toInt
+      else 1
 
     val cAttach =
       if(opts.has( "cAttach" )) opts.valueOf( "cAttach" ).toString.toDouble else 15.0
@@ -79,11 +81,14 @@ object VanillaDMV {
 
     val slidingBabySteps = if( opts.has( "slidingBabySteps" ) ) 25 else 0
 
+    val randomSeed =
+      if( opts.has( "randomSeed" ) ) opts.valueOf( "randomSeed" ).toString.toInt else 10
+
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
-    println( "rightFirst: " + rightFirst )
+    println( "grammarInitMinLength: " + grammarInitMinLength )
     println( "cAttach: " + cAttach )
     println( "cStop: " + cStop )
     println( "cNotStop: " + cNotStop )
@@ -177,25 +182,47 @@ object VanillaDMV {
     val estimator = new VanillaDMVEstimator
 
 
-    val initialGrammar =
-      if( grammarInit == "harmonic" ) {
-        print( "Initializing harmonic grammar..." )
-        estimator.setHarmonicGrammar(
-          trainSet,
-          rightFirst = rightFirst,
-          cAttach = cAttach,
-          cStop = cStop,
-          cNotStop = cNotStop,
-          stopUniformity = stopUniformity
-        )
-      } else if ( grammarInit == "priors" ) {
-        print( "Init to priors..." )
-        estimator.g.setUniform(vocab)
-        //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
-      } else {
-        print( "Initializing random grammar..." )
-        estimator.g.randomize(vocab)
-      }
+    if( grammarInit == "hardlineStopHarmonicGrammar" ) {
+      print( "Initializing hardline stop harmonic grammar..." )
+      estimator.setHardlineStopHarmonicGrammar(
+        trainSet.filter{ _.length >= grammarInitMinLength },
+        cAttach = cAttach,
+        cStop = cStop,
+        cNotStop = cNotStop,
+        stopUniformity = stopUniformity
+      )
+    } else if( grammarInit == "mismatchedHardlineStopHarmonicGrammar" ) {
+      print( "Initializing mismatched hardline stop harmonic grammar..." )
+      estimator.setMismatchedHardlineStopHarmonicGrammar(
+        trainSet.filter{ _.length >= grammarInitMinLength },
+        cAttach = cAttach,
+        cStop = cStop,
+        cNotStop = cNotStop,
+        stopUniformity = stopUniformity
+      )
+    } else if ( grammarInit == "gradedStopHarmonicGrammar" ) {
+      print( "Initializing graded stop harmonic grammar..." )
+      estimator.setGradedStopHarmonicGrammar(
+        trainSet.filter{ _.length >= grammarInitMinLength },
+        cAttach = cAttach,
+        cStop = cStop,
+        cNotStop = cNotStop,
+        stopUniformity = stopUniformity
+      )
+    } else if ( grammarInit == "uniformStopHarmonicGrammar" ) {
+      print( "Initializing uniform stop harmonic grammar..." )
+      estimator.setUniformStopHarmonicGrammar(
+        trainSet.filter{ _.length >= grammarInitMinLength },
+        cAttach = cAttach
+      )
+    } else if ( grammarInit == "priors" ) {
+      print( "Init to priors..." )
+      estimator.g.setUniform(vocab)
+      //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
+    } else {
+      print( "Initializing random grammar..." )
+      estimator.g.randomize(vocab)
+    }
 
     // //val initialGrammar =
     // print( "Initializing harmonic grammar..." )
@@ -304,7 +331,7 @@ object VanillaDMV {
             viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            val viterbiParser = new VanillaDMVParser
+            val viterbiParser = new VanillaDMVParser( randomSeed )
             viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
@@ -331,7 +358,7 @@ object VanillaDMV {
               viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             } else {
-              val viterbiParser = new VanillaDMVParser
+              val viterbiParser = new VanillaDMVParser( randomSeed )
               viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
@@ -357,7 +384,7 @@ object VanillaDMV {
                 viterbiParser.setGrammar( estimator.g )
                 println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
               } else {
-                val viterbiParser = new VanillaDMVParser
+                val viterbiParser = new VanillaDMVParser( randomSeed )
                 viterbiParser.setGrammar( estimator.g )
                 println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
               }
@@ -401,7 +428,7 @@ object VanillaDMV {
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser
+      val viterbiParser = new VanillaDMVParser( randomSeed )
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
