@@ -163,8 +163,8 @@ object DMVFullBayesianBackoff {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         new TimedWordPair(
-          { if( findRareWordsA( Word( w1 ) ) <= unkCutoffA ) "UNK" else w1 },
-          { if( findRareWordsB( Word( w2 ) ) <= unkCutoffB ) "UNK" else w2 },
+          { if( findRareWordsA( Word( w1 ) ) <= unkCutoffA ) "UNKA" else w1 },
+          { if( findRareWordsB( Word( w2 ) ) <= unkCutoffB ) "UNKB" else w2 },
           t
         )
       }
@@ -182,8 +182,8 @@ object DMVFullBayesianBackoff {
           val wp = WordPair( wordParts(0), wordParts(1) )
 
           new TimedWordPair(
-            { if( findRareWordsA( Word( wordParts(0) ) ) <= unkCutoffA ) "UNK" else wordParts(0) },
-            { if( findRareWordsB( Word( wordParts(1) ) ) <= unkCutoffB ) "UNK" else wordParts(1) },
+            { if( findRareWordsA( Word( wordParts(0) ) ) <= unkCutoffA ) "UNKA" else wordParts(0) },
+            { if( findRareWordsB( Word( wordParts(1) ) ) <= unkCutoffB ) "UNKB" else wordParts(1) },
             t
           )
 
@@ -287,8 +287,8 @@ object DMVFullBayesianBackoff {
         println( estimator.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
       } else {
         Actor.spawn{
-          val viterbiParser = new VanillaDMVParser
-          viterbiParser.setGrammar( estimator.g )
+          val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+          //viterbiParser.setGrammar( estimator.g )
           println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
         }
       }
@@ -371,8 +371,9 @@ object DMVFullBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn{
-              val viterbiParser = new VanillaDMVParser
-              viterbiParser.setGrammar( estimator.g )
+              //val viterbiParser = new VanillaDMVParser
+              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
           }
@@ -424,8 +425,9 @@ object DMVFullBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn {
-              val viterbiParser = new VanillaDMVParser
-              viterbiParser.setGrammar( estimator.g )
+              //val viterbiParser = new VanillaDMVParser
+              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
             }
           }
@@ -471,8 +473,9 @@ object DMVFullBayesianBackoff {
       // }
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser
-      viterbiParser.setGrammar( estimator.g )
+      //val viterbiParser = new VanillaDMVParser
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+      //viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
     // val viterbiParser = new VanillaDMVParser {

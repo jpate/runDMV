@@ -331,8 +331,9 @@ object VanillaDMV {
             viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            val viterbiParser = new VanillaDMVParser( randomSeed )
-            viterbiParser.setGrammar( estimator.g )
+            //val viterbiParser = new VanillaDMVParser( randomSeed )
+            val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+            //viterbiParser.setGrammar( estimator.g )
             println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           }
         }
@@ -358,8 +359,9 @@ object VanillaDMV {
               viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             } else {
-              val viterbiParser = new VanillaDMVParser( randomSeed )
-              viterbiParser.setGrammar( estimator.g )
+              // val viterbiParser = new VanillaDMVParser( randomSeed )
+              // viterbiParser.setGrammar( estimator.g )
+              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
           }
@@ -384,8 +386,9 @@ object VanillaDMV {
                 viterbiParser.setGrammar( estimator.g )
                 println( viterbiParser.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
               } else {
-                val viterbiParser = new VanillaDMVParser( randomSeed )
-                viterbiParser.setGrammar( estimator.g )
+                // val viterbiParser = new VanillaDMVParser( randomSeed )
+                // viterbiParser.setGrammar( estimator.g )
+                val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
                 println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
               }
             }
@@ -428,8 +431,9 @@ object VanillaDMV {
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser( randomSeed )
-      viterbiParser.setGrammar( estimator.g )
+      // val viterbiParser = new VanillaDMVParser( randomSeed )
+      // viterbiParser.setGrammar( estimator.g )
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
 

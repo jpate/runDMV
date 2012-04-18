@@ -287,8 +287,8 @@ object DMVBothBayesianBackoff {
         println( estimator.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
       } else {
         Actor.spawn{
-          val viterbiParser = new VanillaDMVParser
-          viterbiParser.setGrammar( estimator.g )
+          val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+          //viterbiParser.setGrammar( estimator.g )
           println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
         }
       }
@@ -371,8 +371,8 @@ object DMVBothBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn{
-              val viterbiParser = new VanillaDMVParser
-              viterbiParser.setGrammar( estimator.g )
+              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
           }
@@ -424,8 +424,8 @@ object DMVBothBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
             Actor.spawn {
-              val viterbiParser = new VanillaDMVParser
-              viterbiParser.setGrammar( estimator.g )
+              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
             }
           }
@@ -471,8 +471,8 @@ object DMVBothBayesianBackoff {
       // }
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser
-      viterbiParser.setGrammar( estimator.g )
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+      //viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
     // val viterbiParser = new VanillaDMVParser {
