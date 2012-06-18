@@ -30,6 +30,7 @@ object VanillaDMV {
     optsParser.accepts( "maxMarginalParse" )
     optsParser.accepts( "babySteps" )
     optsParser.accepts( "slidingBabySteps" )
+    optsParser.accepts( "printFinalGrammar" )
     optsParser.accepts( "randomSeed" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
@@ -84,6 +85,8 @@ object VanillaDMV {
     val randomSeed =
       if( opts.has( "randomSeed" ) ) opts.valueOf( "randomSeed" ).toString.toInt else 10
 
+    val printFinalGrammar = opts.has( "printFinalGrammar" )
+
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -102,6 +105,7 @@ object VanillaDMV {
     println( "maxMarginalParse: " + maxMarginalParse )
     println( "babySteps: " + babySteps )
     println( "slidingBabySteps: " + slidingBabySteps )
+    println( "printFinalGrammar: " + printFinalGrammar )
 
     //val unkCutoff = 5
 
@@ -110,23 +114,13 @@ object VanillaDMV {
     var trainSet = io.Source.fromFile( trainStrings ).getLines.toList.map{ line =>
       val fields = line.split( " " ).toList
       ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s, t ) =>
-        // if( streamBBackoff ) {
-        //   val wordParts = s.split( "#" );
-
-        //   val wp = WordPair( wordParts(0), wordParts(1) )
-
-        //   findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
-
-        //   new TimedWordPair( wordParts(0), wordParts(1), t)
-        // } else {
-          findRareWords( Word(s) ) = 1 + findRareWords.getOrElse( Word(s), 0 )
-          new TimedWord(s,t)
-        //}
+        findRareWords( Word(s) ) = 1 + findRareWords.getOrElse( Word(s), 0 )
+        new TimedWord(s,t)
       }.toList
     }
     trainSet = trainSet.map( s =>
         s.map{ case TimedWord( w, t ) =>
-          if( findRareWords( Word( w ) ) <= unkCutoff )
+          if( ( findRareWords( Word( w ) ) <= unkCutoff ) && unkCutoff > 0 )
             if( streamBBackoff )
               new TimedWord( w.split("#")(1), t )
             else
@@ -149,29 +143,14 @@ object VanillaDMV {
       TimedSentence(
         fields head,
         ( (fields tail) zip (0 to ( fields.length-2 )) ).map{ case( s,t ) =>
-          // if( streamBBackoff ) {
-          //   val wordParts = s.split( "#" );
-          //   val wp = WordPair( wordParts(0), wordParts(1) )
-
-          //   if( findRareWords.getOrElse( wp, 0 )  <= unkCutoff ) {
-          //     println( "Considering " + wp + " as UNK" )
-
-          //     new TimedWord( wordParts(1), t )
-
-          //   } else {
-          //     new TimedWordPair( wordParts(0), wordParts(1), t)
-          //   }
-          // } else {
-            if( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) {
-              //println( "Considering " + s + " as UNK" )
-              if( streamBBackoff )
-                new TimedWord( s.split("#")(1), t )
-              else
-                new TimedWord( "UNK", t )
-            } else {
-              new TimedWord(s,t)
-            }
-          //}
+          if( ( findRareWords.getOrElse( Word(s), 0 )  <= unkCutoff ) && unkCutoff > 0 ) {
+            if( streamBBackoff )
+              new TimedWord( s.split("#")(1), t )
+            else
+              new TimedWord( "UNK", t )
+          } else {
+            new TimedWord(s,t)
+          }
         }.toList
       )
     }
@@ -237,8 +216,7 @@ object VanillaDMV {
 
     println( " done" )
 
-    // println( "Initial grammar:\n\n" )
-    // println( estimator.g )
+    //println( "Initial grammar:\n\n" + estimator.g )
 
 
     // val viterbiParser = new VanillaDMVParser
@@ -420,7 +398,10 @@ object VanillaDMV {
       }
     }
 
-    println( "Final grammar:\n" + estimator.g )
+    if( printFinalGrammar )
+      println( "Final grammar:\n" + estimator.g )
+    else
+      println( "Omitting final grammar for space considerations" )
 
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )

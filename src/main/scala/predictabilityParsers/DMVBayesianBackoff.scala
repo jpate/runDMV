@@ -35,6 +35,11 @@ object DMVBayesianBackoff {
     optsParser.accepts( "emissionType" ).withRequiredArg
     optsParser.accepts( "noBackoffAlpha" ).withRequiredArg
     optsParser.accepts( "backoffAlpha" ).withRequiredArg
+    optsParser.accepts( "dmvRulesAlpha" ).withRequiredArg
+    optsParser.accepts( "printFinalGrammar" )
+    optsParser.accepts( "annotateTestSet" )
+    optsParser.accepts( "printFinalPartialCounts" )
+    optsParser.accepts( "printFinalPartialCountsEachUtt" )
     // optsParser.accepts( "stopNoBackoffAlpha" ).withRequiredArg
     // optsParser.accepts( "stopBackoffAlpha" ).withRequiredArg
     // optsParser.accepts( "chooseNoBackoffAlpha" ).withRequiredArg
@@ -102,6 +107,18 @@ object DMVBayesianBackoff {
       if( opts.has("backoffAlpha") ) opts.valueOf( "backoffAlpha").toString.toDouble
       else 70D
 
+    var dmvRulesAlpha =
+      if( opts.has("dmvRulesAlpha") ) opts.valueOf( "dmvRulesAlpha").toString.toDouble
+      else 1D
+
+    val printFinalGrammar = opts.has( "printFinalGrammar" )
+
+    val annotateTestSet = opts.has( "annotateTestSet" )
+
+    val printFinalPartialCounts = opts.has( "printFinalPartialCounts" )
+
+    val printFinalPartialCountsEachUtt = opts.has( "printFinalPartialCountsEachUtt" )
+
         // var stopBackoffAlpha =
         //   if( opts.has("stopBackoffAlpha") ) opts.valueOf( "stopBackoffAlpha").toString.toDouble
         //   else 70D
@@ -142,6 +159,11 @@ object DMVBayesianBackoff {
     println( "emissionType: " + emissionType )
     println( "noBackoffAlpha: " + noBackoffAlpha )
     println( "backoffAlpha: " + backoffAlpha )
+    println( "dmvRulesAlpha: " + dmvRulesAlpha )
+    println( "printFinalGrammar: " + printFinalGrammar )
+    println( "annotateTestSet: " + annotateTestSet )
+    println( "printFinalPartialCounts: " + printFinalPartialCounts )
+    println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
         // println( "stopNoBackoffAlpha: " + stopNoBackoffAlpha )
         // println( "stopBackoffAlpha: " + stopBackoffAlpha )
         // println( "chooseNoBackoffAlpha: " + chooseNoBackoffAlpha )
@@ -160,8 +182,6 @@ object DMVBayesianBackoff {
 
         val wp = WordPair( wordParts(0), wordParts(1) )
 
-        //findRareWords( wp ) = 1 + findRareWords.getOrElse( wp, 0 )
-        //findRareWords( Word( wordParts(0) ) ) = 1 + findRareWords.getOrElse( Word( wordParts(0) ), 0 )
         findRareWordsA( Word( wordParts(0) ) ) = 1 + findRareWordsA.getOrElse( Word( wordParts(0) ), 0 )
         findRareWordsB( Word( wordParts(1) ) ) = 1 + findRareWordsB.getOrElse( Word( wordParts(1) ), 0 )
 
@@ -171,8 +191,8 @@ object DMVBayesianBackoff {
     trainSet = trainSet.map( s =>
       s.map{ case TimedWordPair( w1, w2, t ) =>
         new TimedWordPair(
-          { if( findRareWordsA( Word( w1 ) ) <= unkCutoffA ) "UNK" else w1 },
-          { if( findRareWordsB( Word( w2 ) ) <= unkCutoffB ) "UNK" else w2 },
+          { if( ( findRareWordsA( Word( w1 ) ) <= unkCutoffA ) && unkCutoffA > 0 ) "UNK" else w1 },
+          { if( ( findRareWordsB( Word( w2 ) ) <= unkCutoffB ) && unkCutoffB > 0 ) "UNK" else w2 },
           t
         )
       }
@@ -190,8 +210,8 @@ object DMVBayesianBackoff {
           val wp = WordPair( wordParts(0), wordParts(1) )
 
           new TimedWordPair(
-            { if( findRareWordsA( Word( wordParts(0) ) ) <= unkCutoffA ) "UNK" else wordParts(0) },
-            { if( findRareWordsB( Word( wordParts(1) ) ) <= unkCutoffB ) "UNK" else wordParts(1) },
+            { if( ( findRareWordsA( Word( wordParts(0) ) ) <= unkCutoffA ) && unkCutoffA > 0 ) "UNK" else wordParts(0) },
+            { if( ( findRareWordsB( Word( wordParts(1) ) ) <= unkCutoffB ) && unkCutoffB > 0 ) "UNK" else wordParts(1) },
             t
           )
 
@@ -239,17 +259,20 @@ object DMVBayesianBackoff {
           case "streamB" =>
             new DMVBayesianBackoffGrammar(
               noBackoffAlpha,
-              backoffAlpha
+              backoffAlpha,
+              dmvRulesAlpha
             )
           case "joint" =>
             new DMVBayesianBackoffJointDepsGrammar(
               noBackoffAlpha,
-              backoffAlpha
+              backoffAlpha,
+              dmvRulesAlpha
             )
           case "independent" =>
             new DMVBayesianBackoffIndependentDepsGrammar(
               noBackoffAlpha,
-              backoffAlpha
+              backoffAlpha,
+              dmvRulesAlpha
             )
         }
     }
@@ -292,7 +315,7 @@ object DMVBayesianBackoff {
 
     println( " done" )
 
-    //println( "Initial grammar:\n\n" + estimator.g )
+    // println( "Initial grammar:\n\n" + estimator.g )
 
 
     // val viterbiParser = new VanillaDMVParser
@@ -319,10 +342,10 @@ object DMVBayesianBackoff {
 
     //var thisIterMaxSentLength = 3
     //var thisIterMaxSentLength = trainSet.map{ _.length}.sortWith( _ < _).head
-    val longestSentence = trainSet.map{ _.length}.max
+    val longestSentenceLength = trainSet.map{ _.length}.max
     val shortestSentenceLength = trainSet.map{ _.length}.min
     var slidingWindowLength:Int = 1
-    var thisIterMaxSentLength = shortestSentenceLength
+    var thisIterMaxSentLength = if( babySteps == 0 ) longestSentenceLength else shortestSentenceLength
 
     // var thisIterTrain =
     //   if( babySteps == 0D )
@@ -376,7 +399,7 @@ object DMVBayesianBackoff {
       // deltaFreeEnergy = ( ( lastGrammarFreeEnergy - newFreeEnergy ) / lastGrammarFreeEnergy )
       // println( "Free Energy G_" + iter + ": " + newFreeEnergy + " (" + deltaFreeEnergy + ")" )
 
-      //println( "New grammar:\n\n" + newGrammar )
+      // println( "New grammar:\n\n" + newGrammar )
 
       estimator.setGrammar( newGrammar )
 
@@ -410,7 +433,7 @@ object DMVBayesianBackoff {
 
       if(
         math.abs( deltaLogProb ) <= convergence &&
-        thisIterMaxSentLength < longestSentence
+        thisIterMaxSentLength < longestSentenceLength
       ) {
         if( babySteps > 0D ) {
           println(
@@ -428,7 +451,7 @@ object DMVBayesianBackoff {
           lastCorpusLogProb = 1D
           // deltaFreeEnergy = 1D
           // lastGrammarFreeEnergy = 1D
-        } else if( slidingBabySteps > 0 && slidingWindowLength < longestSentence ) {
+        } else if( slidingBabySteps > 0 && slidingWindowLength < longestSentenceLength ) {
           println(
             "Jumping from sliding window size of " + slidingWindowLength +
               " to " + (slidingWindowLength+1)
@@ -479,9 +502,22 @@ object DMVBayesianBackoff {
       iter += 1
       lastCorpusLogProb = corpusLogProb
       // lastGrammarFreeEnergy = newFreeEnergy
+
+      if( 
+        !( math.abs( deltaLogProb ) > convergence ||
+          deltaLogProb == (0D/0D) ||
+          iter < minIter
+        ) && printFinalPartialCounts
+      ) {
+        print( newPC )
+      }
     }
 
-    println( "Final grammar:\n" + estimator.g )
+    if( printFinalGrammar )
+      println( "Final grammar:\n" + estimator.g )
+    else
+      println( "Omitting final grammar for space considerations" )
+
 
 
     if( maxMarginalParse ) {
@@ -489,6 +525,10 @@ object DMVBayesianBackoff {
       //   override val g = estimator.g
       // }
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( annotateTestSet ) {
+      println( estimator.annotatedMaxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( printFinalPartialCountsEachUtt ) {
+      println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {
       val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
       //viterbiParser.setGrammar( estimator.g )

@@ -34,6 +34,7 @@ object DMVBayesianThreeStreamBackoff {
     optsParser.accepts( "noBackoffAlpha" ).withRequiredArg
     optsParser.accepts( "backoffOneAlpha" ).withRequiredArg
     optsParser.accepts( "backoffTwoAlpha" ).withRequiredArg
+    optsParser.accepts( "randomSeed" ).withRequiredArg
 
     val opts = optsParser.parse( args:_* )
 
@@ -98,6 +99,9 @@ object DMVBayesianThreeStreamBackoff {
       if( opts.has("backoffTwoAlpha") ) opts.valueOf( "backoffTwoAlpha").toString.toDouble
       else 70D
 
+    val printFinalGrammar = opts.has( "printFinalGrammar" )
+
+
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
@@ -119,6 +123,7 @@ object DMVBayesianThreeStreamBackoff {
     println( "noBackoffAlpha: " + noBackoffAlpha )
     println( "backoffOneAlpha: " + backoffOneAlpha )
     println( "backoffTwoAlpha: " + backoffTwoAlpha )
+    println( "printFinalGrammar: " + printFinalGrammar )
 
 
     print( "Reading in training set...." )
@@ -215,8 +220,7 @@ object DMVBayesianThreeStreamBackoff {
     //   println( "chooseBackoffBothAlpha: " + chooseBackoffBothAlpha )
     // }
 
-    // This is the magic line... it should be enough to get this estimator relying on two stream
-    // heads and stream A args...
+    // This is the magic line...
     val estimator = new VanillaDMVEstimator {//( vocab )
       override val g = new DMVBayesianBackoffThreeStreamGrammar(
         noBackoffAlpha,
@@ -453,7 +457,10 @@ object DMVBayesianThreeStreamBackoff {
       // lastGrammarFreeEnergy = newFreeEnergy
     }
 
-    println( "Final grammar:\n" + estimator.g )
+    if( printFinalGrammar )
+      println( "Final grammar:\n" + estimator.g )
+    else
+      println( "Omitting final grammar for space considerations" )
 
 
     if( maxMarginalParse ) {
