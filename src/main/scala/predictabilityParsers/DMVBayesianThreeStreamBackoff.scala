@@ -1,6 +1,8 @@
 package runDMV.predictabilityParsers
 
-import akka.actor.Actor
+//import akka.actor.Actor
+import akka.dispatch.{ Future, ExecutionContext }
+import java.util.concurrent.Executors
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
@@ -323,6 +325,10 @@ object DMVBayesianThreeStreamBackoff {
       else
         trainSet
 
+
+    val pool = Executors.newCachedThreadPool()
+    implicit val ec = ExecutionContext.fromExecutorService( pool )
+
     println( "Beginning VBEM" )
     while(
       math.abs( deltaLogProb ) > convergence ||
@@ -356,14 +362,14 @@ object DMVBayesianThreeStreamBackoff {
 
       if( evalFreq != 0 && iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
-        //Actor.spawn {
+        //Future {
           if( maxMarginalParse ) {
             // val viterbiParser = new VanillaDMVEstimator {
             //   override val g = estimator.g
             // }
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            Actor.spawn{
+            Future{
               // val viterbiParser = new VanillaDMVParser
               // viterbiParser.setGrammar( estimator.g )
               val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
@@ -417,7 +423,7 @@ object DMVBayesianThreeStreamBackoff {
             // }
             println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
-            Actor.spawn {
+            Future {
               // val viterbiParser = new VanillaDMVParser
               // viterbiParser.setGrammar( estimator.g )
               val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
@@ -483,6 +489,7 @@ object DMVBayesianThreeStreamBackoff {
     //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     // println( viterbiParser.constituencyParse( testSet ).mkString(
     //   "convergence:constituency:", "\nconvergence:constituency:", "" ) )
+    pool.shutdown
 
   }
 }

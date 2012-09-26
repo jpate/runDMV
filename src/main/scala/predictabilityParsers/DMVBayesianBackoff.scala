@@ -1,11 +1,15 @@
 package runDMV.predictabilityParsers
 
-import akka.actor.Actor
+//import akka.actor.Actor
+import akka.dispatch.{ ExecutionContext, Future }
+import java.util.concurrent.Executors
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
 import predictabilityParsing.grammars.DMVBayesianBackoffGrammar
+import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalGrammar
+import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalAndBackedOffGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffIndependentDepsGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffJointDepsGrammar
 import predictabilityParsing.types.labels._
@@ -40,6 +44,7 @@ object DMVBayesianBackoff {
     optsParser.accepts( "annotateTestSet" )
     optsParser.accepts( "printFinalPartialCounts" )
     optsParser.accepts( "printFinalPartialCountsEachUtt" )
+    optsParser.accepts( "printArcProbabilities" )
     // optsParser.accepts( "stopNoBackoffAlpha" ).withRequiredArg
     // optsParser.accepts( "stopBackoffAlpha" ).withRequiredArg
     // optsParser.accepts( "chooseNoBackoffAlpha" ).withRequiredArg
@@ -119,6 +124,9 @@ object DMVBayesianBackoff {
 
     val printFinalPartialCountsEachUtt = opts.has( "printFinalPartialCountsEachUtt" )
 
+    val printArcProbabilities = opts.has( "printArcProbabilities" )
+
+
         // var stopBackoffAlpha =
         //   if( opts.has("stopBackoffAlpha") ) opts.valueOf( "stopBackoffAlpha").toString.toDouble
         //   else 70D
@@ -164,12 +172,7 @@ object DMVBayesianBackoff {
     println( "annotateTestSet: " + annotateTestSet )
     println( "printFinalPartialCounts: " + printFinalPartialCounts )
     println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
-        // println( "stopNoBackoffAlpha: " + stopNoBackoffAlpha )
-        // println( "stopBackoffAlpha: " + stopBackoffAlpha )
-        // println( "chooseNoBackoffAlpha: " + chooseNoBackoffAlpha )
-        // println( "chooseBackoffHeadAlpha: " + chooseBackoffHeadAlpha )
-        // println( "chooseBackoffArgAlpha: " + chooseBackoffArgAlpha )
-        // println( "chooseBackoffBothAlpha: " + chooseBackoffBothAlpha )
+    println( "printArcProbabilities: " + printArcProbabilities )
 
 
     print( "Reading in training set...." )
@@ -262,6 +265,18 @@ object DMVBayesianBackoff {
               backoffAlpha,
               dmvRulesAlpha
             )
+          case "fullyConditional" =>
+            new DMVBayesianBackoffFullyConditionalGrammar(
+              noBackoffAlpha,
+              backoffAlpha,
+              dmvRulesAlpha
+            )
+          case "fullyConditionalAndBackedOff" =>
+            new DMVBayesianBackoffFullyConditionalAndBackedOffGrammar(
+              noBackoffAlpha,
+              backoffAlpha,
+              dmvRulesAlpha
+            )
           case "joint" =>
             new DMVBayesianBackoffJointDepsGrammar(
               noBackoffAlpha,
@@ -321,11 +336,14 @@ object DMVBayesianBackoff {
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )
 
+    val pool = Executors.newCachedThreadPool()
+    implicit val ec = ExecutionContext.fromExecutorService( pool )
+
     if( evalFreq != 0 ) {
       if( maxMarginalParse ) {
         println( estimator.maxMarginalParse(testSet, "initial").mkString("\n", "\n", "\n"))
       } else {
-        Actor.spawn{
+        Future {
           val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
           //viterbiParser.setGrammar( estimator.g )
           println( viterbiParser.bothParses(testSet, "initial").mkString("\n", "\n", "\n"))
@@ -412,7 +430,7 @@ object DMVBayesianBackoff {
             // }
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
-            Actor.spawn{
+            Future {
               val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
               //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
@@ -465,7 +483,7 @@ object DMVBayesianBackoff {
             // }
             println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
-            Actor.spawn {
+            Future {
               val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
               //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
@@ -527,6 +545,8 @@ object DMVBayesianBackoff {
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else if( annotateTestSet ) {
       println( estimator.annotatedMaxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( printArcProbabilities ) {
+      println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {
@@ -544,7 +564,10 @@ object DMVBayesianBackoff {
     // println( viterbiParser.constituencyParse( testSet ).mkString(
     //   "convergence:constituency:", "\nconvergence:constituency:", "" ) )
 
+    pool.shutdown
+
   }
+
 }
 
 

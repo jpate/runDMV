@@ -1,6 +1,8 @@
 package runDMV.baselines
 
-import akka.actor.Actor
+//import akka.actor.Actor
+import akka.dispatch.{ Future, ExecutionContext }
+import java.util.concurrent.Executors
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
@@ -32,6 +34,8 @@ object VanillaDMV {
     optsParser.accepts( "slidingBabySteps" )
     optsParser.accepts( "printFinalGrammar" )
     optsParser.accepts( "randomSeed" ).withRequiredArg
+    optsParser.accepts( "printFinalPartialCountsEachUtt" )
+    optsParser.accepts( "printArcProbabilities" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -87,6 +91,9 @@ object VanillaDMV {
 
     val printFinalGrammar = opts.has( "printFinalGrammar" )
 
+    val printFinalPartialCountsEachUtt = opts.has( "printFinalPartialCountsEachUtt" )
+
+    val printArcProbabilities = opts.has( "printArcProbabilities" )
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -106,6 +113,8 @@ object VanillaDMV {
     println( "babySteps: " + babySteps )
     println( "slidingBabySteps: " + slidingBabySteps )
     println( "printFinalGrammar: " + printFinalGrammar )
+    println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
+    println( "printArcProbabilities: " + printArcProbabilities )
 
     //val unkCutoff = 5
 
@@ -267,6 +276,8 @@ object VanillaDMV {
         trainSet
 
 
+    val pool = Executors.newCachedThreadPool()
+    implicit val ec = ExecutionContext.fromExecutorService( pool )
     println( "Beginning EM" )
     //while( deltaLogProb > 0.00001 || deltaLogProb == (0D/0D) || iter < 10 ) {
     while(
@@ -303,7 +314,7 @@ object VanillaDMV {
 
       if( evalFreq != 0 && iter%evalFreq == 0 && babySteps == 0 && slidingBabySteps == 0) {
         val iterLabel = "it" + iter
-        Actor.spawn {
+        Future {
           if( maxMarginalParse ) {
             val viterbiParser = new VanillaDMVEstimator
             viterbiParser.setGrammar( estimator.g )
@@ -331,7 +342,7 @@ object VanillaDMV {
           thisIterTrain = trainSet.filter{ _.length <= thisIterMaxSentLength }
 
           val iterLabel = "sentence"+slidingWindowLength+"Converged"
-          Actor.spawn {
+          Future {
             if( maxMarginalParse ) {
               val viterbiParser = new VanillaDMVEstimator
               viterbiParser.setGrammar( estimator.g )
@@ -358,7 +369,7 @@ object VanillaDMV {
 
           val iterLabel = "window"+slidingWindowLength+"Converged"
           if( slidingWindowLength % evalFreq == 0 )
-            Actor.spawn {
+            Future {
               if( maxMarginalParse ) {
                 val viterbiParser = new VanillaDMVEstimator
                 viterbiParser.setGrammar( estimator.g )
@@ -411,6 +422,10 @@ object VanillaDMV {
       val viterbiParser = new VanillaDMVEstimator
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( printArcProbabilities ) {
+      println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
+    } else if( printFinalPartialCountsEachUtt ) {
+      println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {
       // val viterbiParser = new VanillaDMVParser( randomSeed )
       // viterbiParser.setGrammar( estimator.g )
@@ -422,6 +437,8 @@ object VanillaDMV {
     //   "convergence:dependency:", "\nconvergence:dependency:", "" ) )
     // println( viterbiParser.constituencyParse( testSet ).mkString(
     //   "convergence:constituency:", "\nconvergence:constituency:", "" ) )
+
+    pool.shutdown
 
   }
 }

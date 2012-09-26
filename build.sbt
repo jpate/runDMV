@@ -1,18 +1,21 @@
 name := "runDMV"
 
-version := "0.1"
+version := "0.2-SNAPSHOT"
 
-libraryDependencies += "net.sf.jopt-simple" % "jopt-simple" % "4.0-beta1"
+scalaVersion := "2.9.2"
 
-scalaVersion := "2.9.1"
-
-resolvers += "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
+resolvers ++= Seq(
+  "Local Ivy repository" at "/home/jpate/.ivy2/local/",
+  "Scala Tools Snapshots" at "http://scala-tools.org/repo-snapshots/",
+  "ScalaNLP Maven2" at "http://repo.scalanlp.org/repo",
+  "Typesafe Repository" at "http://repo.typesafe.com/typesafe/releases/"
+)
 
 libraryDependencies ++= Seq(
-  "se.scalablesolutions.akka" % "akka-actor" % "1.1.3",
-  "se.scalablesolutions.akka" % "akka-typed-actor" % "1.1.3",
-  "se.scalablesolutions.akka" % "akka-amqp" % "1.1.3",
-  "se.scalablesolutions.akka" % "akka-testkit" % "1.1.3"
+  "net.sf.jopt-simple" % "jopt-simple" % "4.0-beta1",
+  "com.typesafe.akka" % "akka-actor" % "2.0.3",
+  "org.scalala" % "scalala_2.9.1" % "1.0.0.RC2",
+  "predictabilityparsing" %% "predictabilityparsing" % "0.02-SNAPSHOT"
 )
 
 
