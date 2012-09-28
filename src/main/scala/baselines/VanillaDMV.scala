@@ -36,6 +36,7 @@ object VanillaDMV {
     optsParser.accepts( "randomSeed" ).withRequiredArg
     optsParser.accepts( "printFinalPartialCountsEachUtt" )
     optsParser.accepts( "printArcProbabilities" )
+    optsParser.accepts( "printStopProbabilities" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -95,6 +96,8 @@ object VanillaDMV {
 
     val printArcProbabilities = opts.has( "printArcProbabilities" )
 
+    val printStopProbabilities = opts.has( "printStopProbabilities" )
+
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
@@ -115,6 +118,7 @@ object VanillaDMV {
     println( "printFinalGrammar: " + printFinalGrammar )
     println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
     println( "printArcProbabilities: " + printArcProbabilities )
+    println( "printStopProbabilities: " + printStopProbabilities )
 
     //val unkCutoff = 5
 
@@ -422,8 +426,12 @@ object VanillaDMV {
       val viterbiParser = new VanillaDMVEstimator
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( printArcProbabilities & printStopProbabilities ) {
+      println( estimator.stopAndArcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printArcProbabilities ) {
       println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
+    } else if( printStopProbabilities ) {
+      println( estimator.stopProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {

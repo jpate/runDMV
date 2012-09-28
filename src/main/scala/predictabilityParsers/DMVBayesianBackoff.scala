@@ -45,12 +45,7 @@ object DMVBayesianBackoff {
     optsParser.accepts( "printFinalPartialCounts" )
     optsParser.accepts( "printFinalPartialCountsEachUtt" )
     optsParser.accepts( "printArcProbabilities" )
-    // optsParser.accepts( "stopNoBackoffAlpha" ).withRequiredArg
-    // optsParser.accepts( "stopBackoffAlpha" ).withRequiredArg
-    // optsParser.accepts( "chooseNoBackoffAlpha" ).withRequiredArg
-    // optsParser.accepts( "chooseBackoffArgAlpha" ).withRequiredArg
-    // optsParser.accepts( "chooseBackoffHeadAlpha" ).withRequiredArg
-    // optsParser.accepts( "chooseBackoffBothAlpha" ).withRequiredArg
+    optsParser.accepts( "printStopProbabilities" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -127,6 +122,8 @@ object DMVBayesianBackoff {
     val printArcProbabilities = opts.has( "printArcProbabilities" )
 
 
+    val printStopProbabilities = opts.has( "printStopProbabilities" )
+
         // var stopBackoffAlpha =
         //   if( opts.has("stopBackoffAlpha") ) opts.valueOf( "stopBackoffAlpha").toString.toDouble
         //   else 70D
@@ -173,6 +170,7 @@ object DMVBayesianBackoff {
     println( "printFinalPartialCounts: " + printFinalPartialCounts )
     println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
     println( "printArcProbabilities: " + printArcProbabilities )
+    println( "printStopProbabilities: " + printStopProbabilities )
 
 
     print( "Reading in training set...." )
@@ -545,8 +543,12 @@ object DMVBayesianBackoff {
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else if( annotateTestSet ) {
       println( estimator.annotatedMaxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
+    } else if( printArcProbabilities & printStopProbabilities ) {
+      println( estimator.stopAndArcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printArcProbabilities ) {
       println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
+    } else if( printStopProbabilities ) {
+      println( estimator.stopProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {
