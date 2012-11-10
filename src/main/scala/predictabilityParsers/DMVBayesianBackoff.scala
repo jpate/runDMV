@@ -8,8 +8,8 @@ import joptsimple.OptionSet;
 //import predictabilityParsing.util.CorpusManipulation
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
 import predictabilityParsing.grammars.DMVBayesianBackoffGrammar
-import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalGrammar
-import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalAndBackedOffGrammar
+// import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalGrammar
+// import predictabilityParsing.grammars.DMVBayesianBackoffFullyConditionalAndBackedOffGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffIndependentDepsGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffJointDepsGrammar
 import predictabilityParsing.types.labels._
@@ -263,18 +263,18 @@ object DMVBayesianBackoff {
               backoffAlpha,
               dmvRulesAlpha
             )
-          case "fullyConditional" =>
-            new DMVBayesianBackoffFullyConditionalGrammar(
-              noBackoffAlpha,
-              backoffAlpha,
-              dmvRulesAlpha
-            )
-          case "fullyConditionalAndBackedOff" =>
-            new DMVBayesianBackoffFullyConditionalAndBackedOffGrammar(
-              noBackoffAlpha,
-              backoffAlpha,
-              dmvRulesAlpha
-            )
+          // case "fullyConditional" =>
+          //   new DMVBayesianBackoffFullyConditionalGrammar(
+          //     noBackoffAlpha,
+          //     backoffAlpha,
+          //     dmvRulesAlpha
+          //   )
+          // case "fullyConditionalAndBackedOff" =>
+          //   new DMVBayesianBackoffFullyConditionalAndBackedOffGrammar(
+          //     noBackoffAlpha,
+          //     backoffAlpha,
+          //     dmvRulesAlpha
+          //   )
           case "joint" =>
             new DMVBayesianBackoffJointDepsGrammar(
               noBackoffAlpha,
