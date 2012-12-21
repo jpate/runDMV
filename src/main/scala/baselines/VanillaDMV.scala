@@ -18,14 +18,18 @@ object VanillaDMV {
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
     optsParser.accepts( "grammarInit" ).withRequiredArg
+    optsParser.accepts( "randomSeed" ).withRequiredArg
     optsParser.accepts( "grammarInitMinLength" ).withRequiredArg
     optsParser.accepts( "cAttach" ).withRequiredArg
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
+    optsParser.accepts( "uniformRoot" )
     optsParser.accepts( "evalFreq" ).withRequiredArg
     optsParser.accepts( "unkCutoff" ).withRequiredArg
     optsParser.accepts( "vbEM" ).withRequiredArg
+    optsParser.accepts( "stopAlpha" ).withRequiredArg
+    optsParser.accepts( "chooseAlpha" ).withRequiredArg
     optsParser.accepts( "convergence" ).withRequiredArg
     optsParser.accepts( "minIter" ).withRequiredArg
     optsParser.accepts( "streamBBackoff" )
@@ -48,6 +52,10 @@ object VanillaDMV {
     val grammarInit =
       if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "hardlineStopHarmonicGrammar"
 
+    val randomSeed =
+      if(opts.has( "randomSeed" )) opts.valueOf( "randomSeed" ).toString.toDouble
+      else 15D
+
     val grammarInitMinLength =
       if(opts.has( "grammarInitMinLength" )) opts.valueOf( "grammarInitMinLength" ).toString.toInt
       else 1
@@ -64,6 +72,8 @@ object VanillaDMV {
     val stopUniformity =
       if(opts.has( "stopUniformity" )) opts.valueOf( "stopUniformity" ).toString.toDouble else 20.0
 
+    val uniformRoot = opts.has( "uniformRoot" )
+
     val evalFreq =
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
 
@@ -72,6 +82,14 @@ object VanillaDMV {
 
     val vbEM =
       if(opts.has( "vbEM" )) opts.valueOf( "vbEM" ).toString.toDouble else 0D
+
+    var stopAlpha =
+      if( opts.has("stopAlpha") ) opts.valueOf( "stopAlpha").toString.toDouble
+      else vbEM
+
+    var chooseAlpha =
+      if( opts.has("chooseAlpha") ) opts.valueOf( "chooseAlpha").toString.toDouble
+      else vbEM
 
     val minIter =
       if(opts.has( "minIter" )) opts.valueOf( "minIter" ).toString.toDouble else 1D
@@ -87,9 +105,6 @@ object VanillaDMV {
 
     val slidingBabySteps = if( opts.has( "slidingBabySteps" ) ) 25 else 0
 
-    val randomSeed =
-      if( opts.has( "randomSeed" ) ) opts.valueOf( "randomSeed" ).toString.toInt else 10
-
     val printFinalGrammar = opts.has( "printFinalGrammar" )
 
     val printFinalPartialCountsEachUtt = opts.has( "printFinalPartialCountsEachUtt" )
@@ -101,14 +116,18 @@ object VanillaDMV {
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
+    println( "randomSeed: " + randomSeed )
     println( "grammarInitMinLength: " + grammarInitMinLength )
     println( "cAttach: " + cAttach )
     println( "cStop: " + cStop )
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
+    println( "uniformRoot: " + uniformRoot )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoff: " + unkCutoff )
     println( "vbEM: " + vbEM )
+    println( "stopAlpha: " + stopAlpha )
+    println( "chooseAlpha: " + chooseAlpha )
     println( "minIter: " + minIter )
     println( "convergence: " + convergence )
     println( "streamBBackoff: " + streamBBackoff )
@@ -169,6 +188,9 @@ object VanillaDMV {
     }
     println( " Done; " + testSet.size + " test set strings" )
 
+    print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
+    print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
+
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
 
     val estimator = new VanillaDMVEstimator
@@ -181,7 +203,8 @@ object VanillaDMV {
         cAttach = cAttach,
         cStop = cStop,
         cNotStop = cNotStop,
-        stopUniformity = stopUniformity
+        stopUniformity = stopUniformity,
+        uniformRoot = uniformRoot
       )
     } else if( grammarInit == "mismatchedHardlineStopHarmonicGrammar" ) {
       print( "Initializing mismatched hardline stop harmonic grammar..." )
@@ -213,7 +236,7 @@ object VanillaDMV {
       //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
     } else {
       print( "Initializing random grammar..." )
-      estimator.g.randomize(vocab)
+      estimator.g.randomize(vocab,randomSeed)
     }
 
     // //val initialGrammar =
@@ -300,7 +323,7 @@ object VanillaDMV {
       val newGrammar =
         if( vbEM > 0 ) {
           println( "VB grammar" )
-          newPC.toVariationalDMVGrammar( vbEM )
+          newPC.toVariationalDMVGrammar( stopAlpha = stopAlpha, chooseAlpha = chooseAlpha )
         } else if( babySteps > 0 ) {
           println( "Baby steps grammar" )
           newPC.toLaplaceSmoothedGrammar( vocab, babySteps )
@@ -417,6 +440,80 @@ object VanillaDMV {
       println( "Final grammar:\n" + estimator.g )
     else
       println( "Omitting final grammar for space considerations" )
+
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( Word("IN"), RightAttachment ) + ", " +
+      Word( "foo" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( Word("IN"),
+      RightAttachment ), Word( "foo" )) )
+    )
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( Word("IN"), RightAttachment ) + ", " +
+      Word( "foo" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( Word("IN"),
+      RightAttachment ), Word( "foo" )) )
+    )
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( Word("blrgl"), RightAttachment ) + ", " +
+      Word( "foo" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( Word("blrgl"),
+      RightAttachment ), Word( "foo" ) ))
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("IN"), RightAttachment, true ) + ", " +
+      Stop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("IN"),
+      RightAttachment, true ), Stop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("IN"), RightAttachment, true ) + ", " +
+      NotStop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("IN"),
+      RightAttachment, true ), NotStop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("blrgl"), RightAttachment, true ) + ", " +
+      Stop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("blrgl"),
+      RightAttachment, true ), Stop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("blrgl"), RightAttachment, true ) + ", " +
+      NotStop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("blrgl"),
+      RightAttachment, true ), NotStop ) )
+    )
+
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("UNK"), RightAttachment, true ) + ", " +
+      Stop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("UNK"),
+      RightAttachment, true ), Stop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( Word("UNK"), RightAttachment, true ) + ", " +
+      NotStop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( Word("UNK"),
+      RightAttachment, true ), NotStop ) )
+    )
+
+
+
+    // println(
+    //   "estimator.g.chooseScore(" + ChooseArgument( Word("IN"), RightAttachment ) + ", " +
+    //   Word( "foo" ) + ") = " + estimator.g.chooseScore(ChooseArgument( Word("IN"),
+    //   RightAttachment ), Word( "foo" ))
+    // )
+
+    // println(
+    //   "estimator.g.chooseScore(" + ChooseArgument( Word("bar"), RightAttachment ) + ", " +
+    //   Word( "foo" ) + ") = " + estimator.g.chooseScore(ChooseArgument( Word("bar"),
+    //   RightAttachment ), Word( "foo" ))
+    // )
+
+
+
+
 
     // val viterbiParser = new VanillaDMVParser
     // viterbiParser.setGrammar( estimator.g )

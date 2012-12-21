@@ -18,4 +18,6 @@ libraryDependencies ++= Seq(
   "predictabilityparsing" %% "predictabilityparsing" % "0.02-SNAPSHOT"
 )
 
+publishArtifact in packageDoc := false
+
 

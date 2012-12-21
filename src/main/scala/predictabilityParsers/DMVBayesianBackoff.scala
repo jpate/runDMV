@@ -22,12 +22,14 @@ object DMVBayesianBackoff {
     optsParser.accepts( "trainStrings" ).withRequiredArg
     optsParser.accepts( "testStrings" ).withRequiredArg
     optsParser.accepts( "grammarInit" ).withRequiredArg
+    optsParser.accepts( "randomSeed" ).withRequiredArg
     optsParser.accepts( "grammarInitMinLength" ).withRequiredArg
     optsParser.accepts( "rightFirst" ).withRequiredArg
     optsParser.accepts( "cAttach" ).withRequiredArg
     optsParser.accepts( "cStop" ).withRequiredArg
     optsParser.accepts( "cNotStop" ).withRequiredArg
     optsParser.accepts( "stopUniformity" ).withRequiredArg
+    optsParser.accepts( "uniformRoot" )
     optsParser.accepts( "evalFreq" ).withRequiredArg
     optsParser.accepts( "unkCutoffA" ).withRequiredArg
     optsParser.accepts( "unkCutoffB" ).withRequiredArg
@@ -40,6 +42,8 @@ object DMVBayesianBackoff {
     optsParser.accepts( "noBackoffAlpha" ).withRequiredArg
     optsParser.accepts( "backoffAlpha" ).withRequiredArg
     optsParser.accepts( "dmvRulesAlpha" ).withRequiredArg
+    optsParser.accepts( "stopAlpha" ).withRequiredArg
+    optsParser.accepts( "chooseAlpha" ).withRequiredArg
     optsParser.accepts( "printFinalGrammar" )
     optsParser.accepts( "annotateTestSet" )
     optsParser.accepts( "printFinalPartialCounts" )
@@ -54,6 +58,10 @@ object DMVBayesianBackoff {
 
     val grammarInit =
       if(opts.has( "grammarInit" )) opts.valueOf( "grammarInit" ).toString else "hardlineStopHarmonicGrammar"
+
+    val randomSeed =
+      if(opts.has( "randomSeed" )) opts.valueOf( "randomSeed" ).toString.toDouble
+      else 15D
 
     val grammarInitMinLength =
       if(opts.has( "grammarInitMinLength" )) opts.valueOf( "grammarInitMinLength" ).toString.toInt
@@ -74,6 +82,8 @@ object DMVBayesianBackoff {
 
     val stopUniformity =
       if(opts.has( "stopUniformity" )) opts.valueOf( "stopUniformity" ).toString.toDouble else 20.0
+
+    val uniformRoot = opts.has( "uniformRoot" )
 
     val evalFreq =
       if(opts.has( "evalFreq" )) opts.valueOf( "evalFreq" ).toString.toInt else 4
@@ -111,6 +121,14 @@ object DMVBayesianBackoff {
       if( opts.has("dmvRulesAlpha") ) opts.valueOf( "dmvRulesAlpha").toString.toDouble
       else 1D
 
+    var stopAlpha =
+      if( opts.has("stopAlpha") ) opts.valueOf( "stopAlpha").toString.toDouble
+      else dmvRulesAlpha
+
+    var chooseAlpha =
+      if( opts.has("chooseAlpha") ) opts.valueOf( "chooseAlpha").toString.toDouble
+      else dmvRulesAlpha
+
     val printFinalGrammar = opts.has( "printFinalGrammar" )
 
     val annotateTestSet = opts.has( "annotateTestSet" )
@@ -147,12 +165,14 @@ object DMVBayesianBackoff {
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
+    println( "randomSeed: " + randomSeed )
     println( "grammarInitMinLength: " + grammarInitMinLength )
     println( "rightFirst: " + rightFirst )
     println( "cAttach: " + cAttach )
     println( "cStop: " + cStop )
     println( "cNotStop: " + cNotStop )
     println( "stopUniformity: " + stopUniformity )
+    println( "uniformRoot: " + uniformRoot )
     println( "evalFreq: " + evalFreq )
     println( "unkCutoffA: " + unkCutoffA )
     println( "unkCutoffB: " + unkCutoffB )
@@ -165,6 +185,8 @@ object DMVBayesianBackoff {
     println( "noBackoffAlpha: " + noBackoffAlpha )
     println( "backoffAlpha: " + backoffAlpha )
     println( "dmvRulesAlpha: " + dmvRulesAlpha )
+    println( "stopAlpha: " + stopAlpha )
+    println( "chooseAlpha: " + chooseAlpha )
     println( "printFinalGrammar: " + printFinalGrammar )
     println( "annotateTestSet: " + annotateTestSet )
     println( "printFinalPartialCounts: " + printFinalPartialCounts )
@@ -229,6 +251,9 @@ object DMVBayesianBackoff {
     }
     println( " Done; " + testSet.size + " test set strings" )
 
+    print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
+    print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
+
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp} }.toSet
     val streamBVocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp.obsB} }.toSet
 
@@ -261,7 +286,9 @@ object DMVBayesianBackoff {
             new DMVBayesianBackoffGrammar(
               noBackoffAlpha,
               backoffAlpha,
-              dmvRulesAlpha
+              //dmvRulesAlpha
+              stopAlpha,
+              chooseAlpha
             )
           // case "fullyConditional" =>
           //   new DMVBayesianBackoffFullyConditionalGrammar(
@@ -300,7 +327,8 @@ object DMVBayesianBackoff {
         cAttach = cAttach,
         cStop = cStop,
         cNotStop = cNotStop,
-        stopUniformity = stopUniformity
+        stopUniformity = stopUniformity,
+        uniformRoot = uniformRoot
       )
     } else if ( grammarInit == "gradedStopHarmonicGrammar" ) {
       print( "Initializing graded stop harmonic grammar..." )
@@ -323,7 +351,7 @@ object DMVBayesianBackoff {
       //estimator.setGrammar( estimator.g.emptyPartialCounts.toDMVGrammar )
     } else {
       print( "Initializing random grammar..." )
-      estimator.g.randomize(vocab)
+      estimator.g.randomize(vocab,randomSeed)
     }
 
     println( " done" )
@@ -429,7 +457,8 @@ object DMVBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
             Future {
-              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              val viterbiParser = new VanillaDMVParser { override val g =
+              estimator.g/*.forNewSentences*/ }
               //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
@@ -536,6 +565,55 @@ object DMVBayesianBackoff {
 
 
 
+    // println( "Parsing grammar:\n" + estimator.g.forNewSentences )
+
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( WordPair("IN","6"), RightAttachment ) + ", " +
+      WordPair( "foo", "bar" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( WordPair("IN","6"),
+      RightAttachment ), WordPair( "foo", "bar" )) )
+    )
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( WordPair("IN","4"), RightAttachment ) + ", " +
+      WordPair( "foo", "bar" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( WordPair("IN","4"),
+      RightAttachment ), WordPair( "foo", "bar" )) )
+    )
+
+    println(
+      "estimator.g.chooseScore(" + ChooseArgument( WordPair("blrgl","8"), RightAttachment ) + ", " +
+      WordPair( "foo", "bar" ) + ") = " + math.exp( estimator.g.chooseScore(ChooseArgument( WordPair("blrgl","8"),
+      RightAttachment ), WordPair( "foo", "bar" )) )
+    )
+
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( WordPair("IN","4"), RightAttachment, true ) + ", " +
+      Stop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( WordPair("IN","4"),
+      RightAttachment, true ), Stop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( WordPair("IN","4"), RightAttachment, true ) + ", " +
+      NotStop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( WordPair("IN","4"),
+      RightAttachment, true ), NotStop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( WordPair("blrgl","8"), RightAttachment, true ) + ", " +
+      Stop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( WordPair("blrgl","8"),
+      RightAttachment, true ), Stop ) )
+    )
+
+    println(
+      "estimator.g.stopScore(" + StopOrNot( WordPair("blrgl","8"), RightAttachment, true ) + ", " +
+      NotStop + ") = " + math.exp( estimator.g.stopScore( StopOrNot( WordPair("blrgl","8"),
+      RightAttachment, true ), NotStop ) )
+    )
+
+
+
+
     if( maxMarginalParse ) {
       // val viterbiParser = new VanillaDMVEstimator {
       //   override val g = estimator.g
@@ -552,7 +630,7 @@ object DMVBayesianBackoff {
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
     } else {
-      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g/*.forNewSentences*/ }
       //viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
