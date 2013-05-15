@@ -1,8 +1,8 @@
 name := "runDMV"
 
-version := "0.2-SNAPSHOT"
+version := "0.21-SNAPSHOT"
 
-scalaVersion := "2.9.2"
+scalaVersion := "2.10.0"
 
 resolvers ++= Seq(
   "Local Ivy repository" at "file://home/jpate/.ivy2/local/",
@@ -14,10 +14,10 @@ resolvers ++= Seq(
 libraryDependencies ++= Seq(
   "net.sf.jopt-simple" % "jopt-simple" % "4.0-beta1",
   "com.typesafe.akka" % "akka-actor" % "2.0.3",
-  "org.scalala" % "scalala_2.9.1" % "1.0.0.RC2",
-  "predictabilityparsing" %% "predictabilityparsing" % "0.02-SNAPSHOT"
+  "predictabilityparsing" %% "predictabilityparsing" % "0.021-SNAPSHOT"
 )
 
 publishArtifact in packageDoc := false
 
+scalacOptions ++= Seq( "-deprecation", "-feature" )
 

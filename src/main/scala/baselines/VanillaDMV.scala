@@ -9,6 +9,7 @@ import joptsimple.OptionSet;
 import predictabilityParsing.parsers.{VanillaDMVEstimator,VanillaDMVParser}
 import predictabilityParsing.grammars.DMVGrammar
 import predictabilityParsing.types.labels._
+import scala.language.postfixOps
 
 object VanillaDMV {
   def main( args:Array[String]) {
@@ -41,6 +42,11 @@ object VanillaDMV {
     optsParser.accepts( "printFinalPartialCountsEachUtt" )
     optsParser.accepts( "printArcProbabilities" )
     optsParser.accepts( "printStopProbabilities" )
+    optsParser.accepts( "posteriorMode" )
+    optsParser.accepts( "posteriorMean" )
+    optsParser.accepts( "printSpanProbabilities" )
+    optsParser.accepts( "foldUnfold" )
+    optsParser.accepts( "viterbiWithLogProb" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -113,6 +119,16 @@ object VanillaDMV {
 
     val printStopProbabilities = opts.has( "printStopProbabilities" )
 
+    val posteriorMode = opts.has( "posteriorMode" )
+
+    val posteriorMean = opts.has( "posteriorMean" )
+
+    val printSpanProbabilities = opts.has( "printSpanProbabilities" )
+
+    val foldUnfold = opts.has( "foldUnfold" )
+
+    val viterbiWithLogProb = opts.has( "viterbiWithLogProb" )
+
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
     println( "grammarInit: " + grammarInit )
@@ -138,6 +154,11 @@ object VanillaDMV {
     println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
     println( "printArcProbabilities: " + printArcProbabilities )
     println( "printStopProbabilities: " + printStopProbabilities )
+    println( "posteriorMode: " + posteriorMode )
+    println( "posteriorMean: " + posteriorMean )
+    println( "printSpanProbabilities: " + printSpanProbabilities )
+    println( "foldUnfold: " + foldUnfold )
+    println( "viterbiWithLogProb: " + viterbiWithLogProb )
 
     //val unkCutoff = 5
 
@@ -188,8 +209,8 @@ object VanillaDMV {
     }
     println( " Done; " + testSet.size + " test set strings" )
 
-    print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
-    print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
+    // print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
+    // print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
 
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.w} }.toSet
 
@@ -252,7 +273,7 @@ object VanillaDMV {
 
     println( " done" )
 
-    //println( "Initial grammar:\n\n" + estimator.g )
+    println( "Initial grammar:\n\n" + estimator.g )
 
 
     // val viterbiParser = new VanillaDMVParser
@@ -313,27 +334,37 @@ object VanillaDMV {
       iter < minIter
     ) {
       //val newPC = estimator.computePartialCounts( trainSet )
-      val newPC = estimator.computePartialCounts( thisIterTrain )
+      val newPC =
+        if(foldUnfold)
+          estimator.efficientComputePartialCounts( thisIterTrain )
+        else
+          estimator.computePartialCounts( thisIterTrain )
+
       val corpusLogProb = newPC.getTotalScore
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
       println( "Iteration " + iter + ": " + corpusLogProb + " (" + deltaLogProb + ")" )
 
-      //val newGrammar = newPC.toDMVGrammar
+      //val newGrammar = newPC.toDMVGrammar()
       val newGrammar =
         if( vbEM > 0 ) {
           println( "VB grammar" )
-          newPC.toVariationalDMVGrammar( stopAlpha = stopAlpha, chooseAlpha = chooseAlpha )
+          newPC.toVariationalDMVGrammar(
+            stopAlpha = stopAlpha,
+            chooseAlpha = chooseAlpha,
+            posteriorMode = posteriorMode,
+            posteriorMean = posteriorMean
+          )
         } else if( babySteps > 0 ) {
           println( "Baby steps grammar" )
           newPC.toLaplaceSmoothedGrammar( vocab, babySteps )
         } else if( slidingBabySteps > 0 ) {
           println( "sliding baby steps grammar" )
           //newPC.toLaplaceSmoothedGrammar( vocab, 0.00001D )
-          newPC.toDMVGrammar
+          newPC.toDMVGrammar()
         } else {
           println( "MLE grammar" )
-          newPC.toDMVGrammar
+          newPC.toDMVGrammar()
         }
       // println( "newGrammar:\n" + newGrammar )
 
@@ -350,7 +381,12 @@ object VanillaDMV {
             //val viterbiParser = new VanillaDMVParser( randomSeed )
             val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
             //viterbiParser.setGrammar( estimator.g )
-            println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+            println(
+              if( viterbiWithLogProb )
+                viterbiParser.bothParsesWithLogProb(testSet, "it" + iter ).mkString("\n", "\n", "\n")
+              else
+                viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n")
+            )
           }
         }
       }
@@ -378,7 +414,12 @@ object VanillaDMV {
               // val viterbiParser = new VanillaDMVParser( randomSeed )
               // viterbiParser.setGrammar( estimator.g )
               val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
-              println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
+              println(
+                if( viterbiWithLogProb )
+                  viterbiParser.bothParsesWithLogProb(testSet, "it" + iter ).mkString("\n", "\n", "\n")
+                else
+                  viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n")
+              )
             }
           }
 
@@ -405,7 +446,12 @@ object VanillaDMV {
                 // val viterbiParser = new VanillaDMVParser( randomSeed )
                 // viterbiParser.setGrammar( estimator.g )
                 val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
-                println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
+                println(
+                  if( viterbiWithLogProb )
+                    viterbiParser.bothParsesWithLogProb(testSet, iterLabel ).mkString("\n", "\n", "\n")
+                  else
+                    viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n")
+                )
               }
             }
 
@@ -435,6 +481,23 @@ object VanillaDMV {
         }
       }
     }
+
+    if( posteriorMode )
+      estimator.setGrammar(
+        estimator.computePartialCounts( thisIterTrain ).toVariationalDMVGrammar(
+          stopAlpha = stopAlpha,
+          chooseAlpha = chooseAlpha,
+          posteriorMode = true
+        )
+      )
+    else if ( posteriorMean )
+      estimator.setGrammar(
+        estimator.computePartialCounts( thisIterTrain ).toVariationalDMVGrammar(
+          stopAlpha = stopAlpha,
+          chooseAlpha = chooseAlpha,
+          posteriorMean = true
+        )
+      )
 
     if( printFinalGrammar )
       println( "Final grammar:\n" + estimator.g )
@@ -523,19 +586,28 @@ object VanillaDMV {
       val viterbiParser = new VanillaDMVEstimator
       viterbiParser.setGrammar( estimator.g )
       println( viterbiParser.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
-    } else if( printArcProbabilities & printStopProbabilities ) {
+    } else {
+      // val viterbiParser = new VanillaDMVParser( randomSeed )
+      // viterbiParser.setGrammar( estimator.g )
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+      println(
+        if( viterbiWithLogProb )
+          viterbiParser.bothParsesWithLogProb(testSet, "convergence").mkString("\n", "\n", "\n")
+        else
+          viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n")
+      )
+    }
+
+    if( printArcProbabilities & printStopProbabilities ) {
       println( estimator.stopAndArcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printArcProbabilities ) {
       println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printStopProbabilities ) {
       println( estimator.stopProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
+    } else if( printSpanProbabilities ) {
+      println( estimator.spanProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
-    } else {
-      // val viterbiParser = new VanillaDMVParser( randomSeed )
-      // viterbiParser.setGrammar( estimator.g )
-      val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
-      println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
 
     // println( viterbiParser.dependencyParse( testSet ).mkString(

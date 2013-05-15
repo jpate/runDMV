@@ -13,6 +13,7 @@ import predictabilityParsing.grammars.DMVBayesianBackoffGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffIndependentDepsGrammar
 import predictabilityParsing.grammars.DMVBayesianBackoffJointDepsGrammar
 import predictabilityParsing.types.labels._
+import scala.language.postfixOps
 
 object DMVBayesianBackoff {
   def main( args:Array[String]) {
@@ -50,6 +51,10 @@ object DMVBayesianBackoff {
     optsParser.accepts( "printFinalPartialCountsEachUtt" )
     optsParser.accepts( "printArcProbabilities" )
     optsParser.accepts( "printStopProbabilities" )
+    optsParser.accepts( "posteriorMode" )
+    optsParser.accepts( "posteriorMean" )
+    optsParser.accepts( "printSpanProbabilities" )
+    optsParser.accepts( "foldUnfold" )
 
     val opts = optsParser.parse( args:_* )
 
@@ -139,9 +144,11 @@ object DMVBayesianBackoff {
 
     val printArcProbabilities = opts.has( "printArcProbabilities" )
 
-
     val printStopProbabilities = opts.has( "printStopProbabilities" )
 
+    val posteriorMode = opts.has( "posteriorMode" )
+
+    val posteriorMean = opts.has( "posteriorMean" )
         // var stopBackoffAlpha =
         //   if( opts.has("stopBackoffAlpha") ) opts.valueOf( "stopBackoffAlpha").toString.toDouble
         //   else 70D
@@ -161,6 +168,10 @@ object DMVBayesianBackoff {
         // var chooseBackoffBothAlpha =
         //   if( opts.has("chooseBackoffBothAlpha") ) opts.valueOf( "chooseBackoffBothAlpha").toString.toDouble
         //   else 120D
+
+    val printSpanProbabilities = opts.has( "printSpanProbabilities" )
+
+    val foldUnfold = opts.has( "foldUnfold" )
 
     println( "trainStrings: " + trainStrings )
     println( "testStrings: " + testStrings )
@@ -193,6 +204,10 @@ object DMVBayesianBackoff {
     println( "printFinalPartialCountsEachUtt: " + printFinalPartialCountsEachUtt )
     println( "printArcProbabilities: " + printArcProbabilities )
     println( "printStopProbabilities: " + printStopProbabilities )
+    println( "posteriorMode: " + posteriorMode )
+    println( "posteriorMean: " + posteriorMean )
+    println( "printSpanProbabilities: " + printSpanProbabilities )
+    println( "foldUnfold: " + foldUnfold )
 
 
     print( "Reading in training set...." )
@@ -251,8 +266,8 @@ object DMVBayesianBackoff {
     }
     println( " Done; " + testSet.size + " test set strings" )
 
-    print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
-    print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
+    // print( "training set: \n" + trainSet.map{_.mkString("", " ","")}.mkString("\n","\n","\n\n\n") )
+    // print( "test set: \n" + testSet.mkString("\n","\n","\n\n\n") )
 
     val vocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp} }.toSet
     val streamBVocab = ( trainSet ++ testSet.map{ _.sentence } ).flatMap{ _.map{_.wp.obsB} }.toSet
@@ -419,7 +434,11 @@ object DMVBayesianBackoff {
       deltaLogProb == (0D/0D) ||
       iter < minIter
     ) {
-      val newPC = estimator.computePartialCounts( thisIterTrain )
+      val newPC = if(foldUnfold)
+        estimator.efficientComputePartialCounts( thisIterTrain )
+      else
+        estimator.computePartialCounts( thisIterTrain )
+
       val corpusLogProb = newPC.getTotalScore
       deltaLogProb = ( ( lastCorpusLogProb - corpusLogProb ) / lastCorpusLogProb )
 
@@ -431,19 +450,13 @@ object DMVBayesianBackoff {
       val newGrammar =
         if( babySteps > 0 ) {
           println( "baby steps grammar" )
-          newPC.toDMVGrammar
+          newPC.toDMVGrammar()
         } else if( slidingBabySteps > 0 ) {
           println( "sliding baby steps grammar" )
-          newPC.toDMVGrammar
+          newPC.toDMVGrammar()
         } else {
-          newPC.toDMVGrammar
+          newPC.toDMVGrammar()
         }
-
-      //val newFreeEnergy = newGrammar.freeEnergy
-      // deltaFreeEnergy = ( ( lastGrammarFreeEnergy - newFreeEnergy ) / lastGrammarFreeEnergy )
-      // println( "Free Energy G_" + iter + ": " + newFreeEnergy + " (" + deltaFreeEnergy + ")" )
-
-      // println( "New grammar:\n\n" + newGrammar )
 
       estimator.setGrammar( newGrammar )
 
@@ -451,30 +464,22 @@ object DMVBayesianBackoff {
         val iterLabel = "it" + iter
         //Actor.spawn {
           if( maxMarginalParse ) {
-            // val viterbiParser = new VanillaDMVEstimator {
-            //   override val g = estimator.g
-            // }
             println( estimator.maxMarginalParse(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
           } else {
             Future {
-              val viterbiParser = new VanillaDMVParser { override val g =
-              estimator.g/*.forNewSentences*/ }
-              //viterbiParser.setGrammar( estimator.g )
+              val viterbiParser = new VanillaDMVParser {
+                override val g =
+                  if( posteriorMode )
+                    newPC.toDMVGrammar( posteriorMode = true )
+                  else if( posteriorMean )
+                    newPC.toDMVGrammar( posteriorMean = true )
+                  else
+                    estimator.g
+              }
               println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
             }
           }
-          // val viterbiParser = new VanillaDMVParser {
-          //   override val g = new DMVTwoStreamStopGrammar
-          // }
-          // viterbiParser.setGrammar( newGrammar )
-          // println( viterbiParser.bothParses(testSet, "it" + iter ).mkString("\n", "\n", "\n"))
-
-          // println( viterbiParser.dependencyParse( testSet ).mkString(
-          //   iterLabel+":dependency:", "\n"+iterLabel+":dependency:", "" ) )
-          // println( viterbiParser.constituencyParse( testSet ).mkString(
-          //   iterLabel+":constituency:", "\n"+iterLabel+":constituency:", "" ) )
         }
-      //}
 
       if(
         math.abs( deltaLogProb ) <= convergence &&
@@ -486,11 +491,6 @@ object DMVBayesianBackoff {
           )
           thisIterMaxSentLength += 1
           thisIterTrain = trainSet.filter{ _.length <= thisIterMaxSentLength }
-
-          //estimator.g.laplaceSmooth( thisIterTrain.flatMap{ _.toSet}.toSet, babySteps )
-          //estimator.g.laplaceSmooth( 0.0001, thisIterTrain.flatten.map{_.w}.toSet )
-
-          //println( "Grammar before jumping:\n" + estimator.g )
 
           deltaLogProb = 1D
           lastCorpusLogProb = 1D
@@ -511,7 +511,15 @@ object DMVBayesianBackoff {
             println( estimator.maxMarginalParse(testSet, iterLabel ).mkString("\n", "\n", "\n"))
           } else {
             Future {
-              val viterbiParser = new VanillaDMVParser { override val g = estimator.g }
+              val viterbiParser = new VanillaDMVParser {
+                override val g =
+                  if( posteriorMode )
+                    newPC.toDMVGrammar( posteriorMode = true )
+                  else if( posteriorMean )
+                    newPC.toDMVGrammar( posteriorMean = true )
+                  else
+                    estimator.g
+              }
               //viterbiParser.setGrammar( estimator.g )
               println( viterbiParser.bothParses(testSet, iterLabel ).mkString("\n", "\n", "\n"))
             }
@@ -557,6 +565,15 @@ object DMVBayesianBackoff {
         print( newPC )
       }
     }
+
+    if( posteriorMode )
+      estimator.setGrammar(
+        estimator.computePartialCounts( thisIterTrain ).toDMVGrammar( posteriorMode = true )
+      )
+    else if( posteriorMean )
+      estimator.setGrammar(
+        estimator.computePartialCounts( thisIterTrain ).toDMVGrammar( posteriorMean = true )
+      )
 
     if( printFinalGrammar )
       println( "Final grammar:\n" + estimator.g )
@@ -615,24 +632,25 @@ object DMVBayesianBackoff {
 
 
     if( maxMarginalParse ) {
-      // val viterbiParser = new VanillaDMVEstimator {
-      //   override val g = estimator.g
-      // }
       println( estimator.maxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
     } else if( annotateTestSet ) {
       println( estimator.annotatedMaxMarginalParse(testSet, "convergence").mkString("\n", "\n", "\n"))
-    } else if( printArcProbabilities & printStopProbabilities ) {
+    } else {
+      val viterbiParser = new VanillaDMVParser { override val g = estimator.g/*.forNewSentences*/ }
+      //viterbiParser.setGrammar( estimator.g )
+      println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
+    }
+
+    if( printArcProbabilities & printStopProbabilities ) {
       println( estimator.stopAndArcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printArcProbabilities ) {
       println( estimator.arcProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printStopProbabilities ) {
       println( estimator.stopProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
+    } else if( printSpanProbabilities ) {
+      println( estimator.spanProbabilitiesCSV( testSet ).mkString("\n", "\n", "\n"))
     } else if( printFinalPartialCountsEachUtt ) {
       println( estimator.partialCountsCSV( testSet ).mkString("", "\n", "\n"))
-    } else {
-      val viterbiParser = new VanillaDMVParser { override val g = estimator.g/*.forNewSentences*/ }
-      //viterbiParser.setGrammar( estimator.g )
-      println( viterbiParser.bothParses(testSet, "convergence").mkString("\n", "\n", "\n"))
     }
     // val viterbiParser = new VanillaDMVParser {
     //   override val g = new DMVTwoStreamStopGrammar
